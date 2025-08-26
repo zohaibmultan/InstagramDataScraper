@@ -1,0 +1,1214 @@
+﻿#nullable disable
+using HtmlAgilityPack;
+using LiteDB;
+using Microsoft.VisualBasic.ApplicationServices;
+using Microsoft.Web.WebView2.Core;
+using Microsoft.Web.WebView2.WinForms;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System.Text;
+using System.Windows.Forms.VisualStyles;
+
+namespace SocialMediaDataScraper.Models
+{
+    public static class InstaHelper
+    {
+        private static async Task<WebViewJsExecuteResult> ExecuteJsAsync(WebView2 webView, string jsCode, int waitInSeconds = 15)
+        {
+            var tcs = new TaskCompletionSource<WebViewJsExecuteResult>();
+
+            void WebView_WebMessageReceived(object sender, CoreWebView2WebMessageReceivedEventArgs args)
+            {
+                try
+                {
+                    var message = args.WebMessageAsJson;
+                    var json = JsonConvert.DeserializeObject<dynamic>(message);
+                    tcs.SetResult(new WebViewJsExecuteResult()
+                    {
+                        Status = json.status,
+                        ResultContent = json.body ?? "",
+                        Errors = null,
+                    });
+                }
+                catch (Exception ex)
+                {
+                    tcs.SetResult(new WebViewJsExecuteResult()
+                    {
+                        Status = null,
+                        ResultContent = null,
+                        Errors = ex.GetAllInnerMessages(),
+                    });
+                }
+            }
+
+            try
+            {
+                await webView.CoreWebView2.ExecuteScriptAsync("console.log('--- WebView Script Execuation ---')");
+
+                webView.CoreWebView2.WebMessageReceived += WebView_WebMessageReceived;
+                await webView.CoreWebView2.ExecuteScriptAsync(jsCode);
+
+                var cts = new CancellationTokenSource(TimeSpan.FromSeconds(waitInSeconds));
+                cts.Token.Register(() => tcs.TrySetResult(new WebViewJsExecuteResult()
+                {
+                    Status = null,
+                    ResultContent = null,
+                    Errors = new List<string>()
+                    {
+                        "Request timed out"
+                    }
+                }));
+
+                return await tcs.Task;
+            }
+            catch (Exception ex)
+            {
+                return new WebViewJsExecuteResult()
+                {
+                    Status = null,
+                    ResultContent = null,
+                    Errors = ex.GetAllInnerMessages()
+                };
+            }
+            finally
+            {
+                webView.CoreWebView2.WebMessageReceived -= WebView_WebMessageReceived;
+                await webView.CoreWebView2.ExecuteScriptAsync("console.log('--- End ---')");
+            }
+        }
+
+        public static async Task<InstaResult<List<InstaReel>>> TestLogin(WebView2 webView, string username, int waitInSeconds = 60)
+        {
+            var requestFilter = "graphql/query";
+            var requestUrl = $"https://www.instagram.com/{username}";
+            var responseFilterKey = "X-Root-Field-Name".ToLower();
+            var responseFilterValue = "xdt_api__v1__feed__reels_tray".ToLower();
+            var tcs = new TaskCompletionSource<InstaResult<List<InstaReel>>>();
+
+            bool IsValidRequest(CoreWebView2WebResourceRequest Request)
+            {
+                var check1 = Request.Uri.Contains(requestFilter);
+                var check2 = Request.Headers.Any(x => x.Key.ToLower() == responseFilterKey && x.Value.ToLower() == responseFilterValue);
+                return check1 && check2;
+            }
+
+            async void WebView_WebResourceResponseReceived(object sender, CoreWebView2WebResourceResponseReceivedEventArgs e)
+            {
+                try
+                {
+                    if (!IsValidRequest(e.Request) || e.Response == null) return;
+
+                    using (var stream = await e.Response.GetContentAsync())
+                    {
+                        if (stream == null) return;
+                        using (StreamReader reader = new StreamReader(stream, Encoding.UTF8))
+                        {
+                            if (reader == null) return;
+                            var content = await reader.ReadToEndAsync();
+                            if (string.IsNullOrWhiteSpace(content)) return;
+
+                            var root = JObject.Parse(content);
+                            if (root == null) return;
+
+                            var feed = root["data"]?[responseFilterValue]?["tray"] as JArray;
+                            if (feed == null) return;
+
+                            var reels = feed.ToObject<List<InstaReel>>();
+
+                            tcs.SetResult(new InstaResult<List<InstaReel>>()
+                            {
+                                Status = true,
+                                Content = reels,
+                            });
+                        }
+                    }
+                }
+                catch (Exception)
+                {
+                    return;
+                }
+            }
+
+            try
+            {
+                webView.CoreWebView2.WebResourceResponseReceived += WebView_WebResourceResponseReceived;
+                webView.Source = new Uri(requestUrl);
+
+                var cts = new CancellationTokenSource(TimeSpan.FromSeconds(waitInSeconds));
+                cts.Token.Register(() => tcs.TrySetResult(new InstaResult<List<InstaReel>>()
+                {
+                    Status = false,
+                    Content = null,
+                    Errors = new List<string>() { "Request timed out" }
+                }));
+
+                return await tcs.Task;
+            }
+            catch (Exception ex)
+            {
+                return new InstaResult<List<InstaReel>>
+                {
+                    Status = false,
+                    Content = null,
+                    Errors = ex.GetAllInnerMessages(),
+                };
+            }
+            finally
+            {
+                webView.CoreWebView2.WebResourceResponseReceived -= WebView_WebResourceResponseReceived;
+            }
+        }
+
+
+        public static async Task<InstaResult<InstaProfile>> GetProfileByUsername(WebView2 webView, string username, int waitInSeconds = 60)
+        {
+            var requestUrl = $"https://www.instagram.com/{username}";
+            return await GetProfileByUrl(webView, requestUrl, waitInSeconds);
+        }
+
+        public static async Task<InstaResult<InstaProfile>> GetProfileByUrl(WebView2 webView, string requestUrl, int waitInSeconds = 60)
+        {
+            var requestFilter = "graphql/query";
+            var tcs = new TaskCompletionSource<InstaResult<InstaProfile>>();
+
+            bool IsValidRequest(CoreWebView2WebResourceRequest Request)
+            {
+                var check1 = Request.Uri.Contains(requestFilter);
+                var check2 = Request.Headers.Any(x => x.Key.Equals("X-Root-Field-Name", StringComparison.CurrentCultureIgnoreCase) && x.Value.Equals("fetch__XDTUserDict", StringComparison.CurrentCultureIgnoreCase));
+                var check3 = Request.Headers.Any(x => x.Key.Equals("x-fb-friendly-name", StringComparison.CurrentCultureIgnoreCase) && x.Value.Equals("PolarisProfilePageContentQuery", StringComparison.CurrentCultureIgnoreCase));
+                return check1 && check2 && check3;
+            }
+
+            async void WebView_WebResourceResponseReceived(object sender, CoreWebView2WebResourceResponseReceivedEventArgs e)
+            {
+                try
+                {
+                    if (!IsValidRequest(e.Request) || e.Response == null) return;
+
+                    using (var stream = await e.Response.GetContentAsync())
+                    {
+                        if (stream == null) return;
+                        using (StreamReader reader = new StreamReader(stream, Encoding.UTF8))
+                        {
+                            if (reader == null) return;
+                            var content = await reader.ReadToEndAsync();
+                            if (string.IsNullOrWhiteSpace(content)) return;
+
+                            var root = JObject.Parse(content);
+                            if (root == null) return;
+
+                            var user = (JObject)root["data"]?["user"];
+                            if (user == null) return;
+
+                            var profile = user.ToObject<InstaProfile>();
+                            if (profile == null) return;
+                            if (!profile.Validate()) return;
+
+                            tcs.SetResult(new InstaResult<InstaProfile>()
+                            {
+                                Status = true,
+                                Content = profile,
+                            });
+                        }
+                    }
+                }
+                catch (Exception)
+                {
+                    return;
+                }
+            }
+
+            try
+            {
+                webView.CoreWebView2.WebResourceResponseReceived += WebView_WebResourceResponseReceived;
+                if (webView.Source.ToString() == requestUrl)
+                {
+                    webView.CoreWebView2.Reload();
+                }
+                else
+                {
+                    webView.Source = new Uri(requestUrl);
+                }
+
+                var cts = new CancellationTokenSource(TimeSpan.FromSeconds(waitInSeconds));
+                cts.Token.Register(() => tcs.TrySetResult(new InstaResult<InstaProfile>()
+                {
+                    Status = false,
+                    Content = null,
+                    Errors = new List<string>() { "Request timed out" }
+                }));
+
+                return await tcs.Task;
+            }
+            catch (Exception ex)
+            {
+                return new InstaResult<InstaProfile>
+                {
+                    Status = false,
+                    Content = null,
+                    Errors = ex.GetAllInnerMessages(),
+                };
+            }
+            finally
+            {
+                webView.CoreWebView2.WebResourceResponseReceived -= WebView_WebResourceResponseReceived;
+            }
+        }
+
+
+        public static async Task<InstaResult<InstaPostVr2>> GetPostByShortCode(WebView2 webView, string postShortCode, int waitInSeconds = 60)
+        {
+            var requestUrl = $"https://www.instagram.com/p/{postShortCode}";
+            return await GetPostByUrl(webView, requestUrl, waitInSeconds);
+        }
+
+        public static async Task<InstaResult<InstaPostVr2>> GetPostByUrl(WebView2 webView, string requestUrl, int waitInSeconds = 60)
+        {
+            var tcs = new TaskCompletionSource<InstaResult<InstaPostVr2>>();
+
+            bool IsValidRequest(CoreWebView2WebResourceRequest Request)
+            {
+                var check1 = Request.Uri.Equals(requestUrl);
+                return check1;
+            }
+
+            JObject FindJsonNodeFromScripts(string html, string targetKey)
+            {
+                var doc = new HtmlAgilityPack.HtmlDocument();
+                doc.LoadHtml(html);
+
+                var scripts = doc.DocumentNode.SelectNodes("//script[@type='application/json']")?.Where(node => node.InnerText.Contains(targetKey));
+
+                if (scripts == null || !scripts.Any()) return null;
+
+                foreach (var script in scripts)
+                {
+                    try
+                    {
+                        var json = JObject.Parse(script.InnerText);
+                        var result = FindNodeByKey(json, targetKey);
+                        if (result != null)
+                            return result;
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("JSON Parse Error: " + ex.Message);
+                    }
+                }
+
+                return null;
+            }
+
+            JObject FindNodeByKey(JToken token, string targetKey)
+            {
+                if (token.Type == JTokenType.Object)
+                {
+                    var obj = (JObject)token;
+                    foreach (var prop in obj.Properties())
+                    {
+                        if (prop.Name == targetKey)
+                            return prop.Value as JObject;
+
+                        var found = FindNodeByKey(prop.Value, targetKey);
+                        if (found != null)
+                            return found;
+                    }
+                }
+                else if (token.Type == JTokenType.Array)
+                {
+                    foreach (var item in (JArray)token)
+                    {
+                        var found = FindNodeByKey(item, targetKey);
+                        if (found != null)
+                            return found;
+                    }
+                }
+
+                return null;
+            }
+
+            async void WebView_WebResourceResponseReceived(object sender, CoreWebView2WebResourceResponseReceivedEventArgs e)
+            {
+                try
+                {
+                    if (!IsValidRequest(e.Request) || e.Response == null) return;
+
+                    using (var stream = await e.Response.GetContentAsync())
+                    {
+                        if (stream == null) return;
+                        using (StreamReader reader = new StreamReader(stream, Encoding.UTF8))
+                        {
+                            if (reader == null) return;
+                            var content = await reader.ReadToEndAsync();
+                            if (string.IsNullOrWhiteSpace(content)) return;
+
+                            var obj = FindJsonNodeFromScripts(content, "xdt_api__v1__media__shortcode__web_info");
+                            var edges = (JArray)obj["items"];
+                            var node = edges[0].ToObject<InstaPostVr2>();
+
+                            tcs.SetResult(new InstaResult<InstaPostVr2>()
+                            {
+                                Status = true,
+                                Content = node,
+                            });
+                        }
+                    }
+                }
+                catch (Exception)
+                {
+                    return;
+                }
+            }
+
+            try
+            {
+                webView.CoreWebView2.WebResourceResponseReceived += WebView_WebResourceResponseReceived;
+                if (webView.Source.ToString() == requestUrl)
+                {
+                    webView.CoreWebView2.Reload();
+                }
+                else
+                {
+                    webView.Source = new Uri(requestUrl);
+                }
+
+                var cts = new CancellationTokenSource(TimeSpan.FromSeconds(waitInSeconds));
+                cts.Token.Register(() => tcs.TrySetResult(new InstaResult<InstaPostVr2>()
+                {
+                    Status = false,
+                    Content = null,
+                    Errors = new List<string>() { "Request timed out" }
+                }));
+
+                return await tcs.Task;
+            }
+            catch (Exception ex)
+            {
+                return new InstaResult<InstaPostVr2>
+                {
+                    Status = false,
+                    Content = null,
+                    Errors = ex.GetAllInnerMessages(),
+                };
+            }
+            finally
+            {
+                webView.CoreWebView2.WebResourceResponseReceived -= WebView_WebResourceResponseReceived;
+            }
+        }
+
+        public static async Task<InstaResult<List<InstaPost>>> GetPostsByUsername(WebView2 webView, string username, CancellationTokenSource cancellationToken, int postCount = 0, int minWait = 5, int maxWait = 15, EventHandler<InstaPostProgressArgs<InstaPost>> taskProgress = null, int loopBreakAttemps = 3)
+        {
+            var requestUrl = $"https://www.instagram.com/{username}";
+            return await GetPostsByUrl(webView, requestUrl, cancellationToken, postCount, minWait, maxWait, taskProgress, loopBreakAttemps);
+        }
+
+        public static async Task<InstaResult<List<InstaPost>>> GetPostsByUrl(WebView2 webView, string requestUrl, CancellationTokenSource cancellationToken, int postCount = 0, int minWait = 5, int maxWait = 15, EventHandler<InstaPostProgressArgs<InstaPost>> taskProgress = null, int loopBreakAttemps = 3)
+        {
+            var requestFilter = "graphql/query";
+            var allPosts = new List<InstaPost>();
+            var random = new Random();
+            var attempts = loopBreakAttemps;
+            var requests = new Dictionary<string, bool>();
+
+            bool IsValidRequest(CoreWebView2WebResourceRequest Request)
+            {
+                var check1 = Request.Uri.Contains(requestFilter);
+                var check2 = Request.Headers.Any(x => x.Key.Equals("X-Root-Field-Name", StringComparison.CurrentCultureIgnoreCase) && x.Value.Equals("xdt_api__v1__feed__user_timeline_graphql_connection", StringComparison.CurrentCultureIgnoreCase));
+                return check1 && check2;
+            }
+
+            async void OnWebResourceRequested(object sender, CoreWebView2WebResourceRequestedEventArgs e)
+            {
+                await Task.Delay(0);
+                if (IsValidRequest(e.Request))
+                {
+                    var requestId = Guid.NewGuid().ToString();
+                    e.Request.Headers.SetHeader("X-Request-Id", requestId);
+                    requests.Add(requestId, false);
+                }
+            }
+
+            async void OnWebResourceResponseReceived(object sender, CoreWebView2WebResourceResponseReceivedEventArgs e)
+            {
+                try
+                {
+                    if (!IsValidRequest(e.Request)) return;
+
+                    var headerReqId = e.Request.Headers.FirstOrDefault(x => x.Key.Equals("X-Request-Id", StringComparison.CurrentCultureIgnoreCase));
+                    requests[headerReqId.Value] = true;
+
+                    attempts--;
+
+                    using (var stream = await e.Response.GetContentAsync())
+                    {
+                        if (stream == null) return;
+                        using (StreamReader reader = new StreamReader(stream, Encoding.UTF8))
+                        {
+                            if (reader == null) return;
+                            var content = await reader.ReadToEndAsync();
+                            if (string.IsNullOrWhiteSpace(content)) return;
+
+                            var root = JObject.Parse(content);
+                            var edges = (JArray)root["data"]?["xdt_api__v1__feed__user_timeline_graphql_connection"]?["edges"];
+                            foreach (var edge in edges)
+                            {
+                                var node = (JObject)edge["node"];
+                                if (node == null) continue;
+
+                                var post = node.ToObject<InstaPost>();
+                                if (post == null) continue;
+
+                                allPosts.Add(post);
+                            }
+
+                            taskProgress?.Invoke(webView, new InstaPostProgressArgs<InstaPost>()
+                            {
+                                Message = $"{allPosts.Count()} posts collected, attempts remaining {attempts}",
+                            });
+                        }
+                    }
+                }
+                catch (Exception)
+                {
+
+                }
+            }
+
+            try
+            {
+                webView.CoreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
+                webView.CoreWebView2.WebResourceRequested += OnWebResourceRequested;
+                webView.CoreWebView2.WebResourceResponseReceived += OnWebResourceResponseReceived;
+
+                if (webView.Source.ToString() == requestUrl)
+                {
+                    webView.CoreWebView2.Reload();
+                }
+                else
+                {
+                    webView.Source = new Uri(requestUrl);
+                }
+
+                while (!cancellationToken.IsCancellationRequested && allPosts.Count < postCount)
+                {
+                    if (requests.Values.Any(x => !x))
+                    {
+                        await Task.Delay(1000, cancellationToken.Token);
+                        continue;
+                    }
+
+                    if (attempts == 0)
+                    {
+                        var wait = random.Next(15, 30);
+                        attempts = loopBreakAttemps;
+
+                        taskProgress?.Invoke(webView, new InstaPostProgressArgs<InstaPost>()
+                        {
+                            Message = $"Break loop wait for {wait} seconds...",
+                            BreakLoop = true,
+                            BreakLoopWait = random.Next(60, 180)
+                        });
+                        await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken.Token);
+
+                        continue;
+                    }
+
+                    WebViewHelper.ScrollDown(webView);
+
+                    var timeWait = random.Next(minWait, maxWait);
+                    taskProgress?.Invoke(webView, new InstaPostProgressArgs<InstaPost>()
+                    {
+                        Message = $"Wait for {timeWait} seconds...",
+                    });
+
+                    await Task.Delay(TimeSpan.FromSeconds(timeWait), cancellationToken.Token);
+                }
+
+                return new InstaResult<List<InstaPost>>()
+                {
+                    Status = true,
+                    Content = allPosts,
+                };
+            }
+            catch (Exception ex)
+            {
+                return new InstaResult<List<InstaPost>>()
+                {
+                    Status = allPosts.Count > 0,
+                    Content = allPosts,
+                    Errors = ex.GetAllInnerMessages()
+                };
+            }
+            finally
+            {
+                webView.CoreWebView2.WebResourceRequested -= OnWebResourceRequested;
+                webView.CoreWebView2.WebResourceResponseReceived -= OnWebResourceResponseReceived;
+            }
+        }
+
+
+        public static async Task<InstaResult<List<InstFollowing>>> GetFollowings(WebView2 webView, string username, int amount, CancellationTokenSource cancellationToken, EventHandler<List<InstFollowing>> taskProgress = null, int retryAttemps = 3)
+        {
+            var requestFilter = "api/v1/friendships";
+            var requestUrl = $"https://www.instagram.com/{username}/following/";
+            var requestCount = 0;
+            var responseCount = 0;
+            var followings = new List<InstFollowing>();
+
+            bool IsValidRequest(CoreWebView2WebResourceRequest Request)
+            {
+                var check1 = Request.Uri.Contains(requestFilter);
+                return check1;
+            }
+
+            async void OnWebResourceRequested(object sender, CoreWebView2WebResourceRequestedEventArgs e)
+            {
+                await Task.Delay(0);
+                if (IsValidRequest(e.Request))
+                    requestCount++;
+            }
+
+            async void OnWebResourceResponseReceived(object sender, CoreWebView2WebResourceResponseReceivedEventArgs e)
+            {
+                try
+                {
+                    if (!IsValidRequest(e.Request)) return;
+
+                    responseCount++;
+
+                    using (var stream = await e.Response.GetContentAsync())
+                    {
+                        if (stream == null) return;
+                        using (StreamReader reader = new StreamReader(stream, Encoding.UTF8))
+                        {
+                            if (reader == null) return;
+                            var content = await reader.ReadToEndAsync();
+                            if (string.IsNullOrWhiteSpace(content)) return;
+
+                            var root = JObject.Parse(content);
+                            var users = (JArray)root["users"];
+                            if (users == null) return;
+
+                            foreach (var user in users)
+                            {
+                                var node = (JObject)user;
+                                if (node == null) continue;
+
+                                var post = node.ToObject<InstFollowing>();
+                                if (post == null) continue;
+
+                                followings.Add(post);
+                            }
+
+                            taskProgress?.Invoke(webView, followings);
+                        }
+                    }
+                }
+                catch (Exception)
+                {
+
+                }
+            }
+
+            try
+            {
+                webView.CoreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
+                webView.CoreWebView2.WebResourceRequested += OnWebResourceRequested;
+                webView.CoreWebView2.WebResourceResponseReceived += OnWebResourceResponseReceived;
+
+                if (webView.Source.ToString() == requestUrl)
+                {
+                    webView.CoreWebView2.Reload();
+                }
+                else
+                {
+                    webView.Source = new Uri(requestUrl);
+                }
+
+                while (true)
+                {
+                    if (requestCount == responseCount)
+                    {
+                        WebViewHelper.ScrollDown(webView);
+                    }
+
+                    if (cancellationToken.IsCancellationRequested || followings.Count >= amount)
+                    {
+                        break;
+                    }
+
+                    await Task.Delay(5000);
+                }
+
+                return new InstaResult<List<InstFollowing>>()
+                {
+                    Status = true,
+                    Content = followings,
+                };
+            }
+            catch (Exception ex)
+            {
+                return new InstaResult<List<InstFollowing>>()
+                {
+                    Status = followings.Count > 0,
+                    Content = followings,
+                    Errors = ex.GetAllInnerMessages()
+                };
+            }
+            finally
+            {
+                webView.CoreWebView2.WebResourceRequested -= OnWebResourceRequested;
+                webView.CoreWebView2.WebResourceResponseReceived -= OnWebResourceResponseReceived;
+            }
+        }
+
+        public static async Task<InstaResult<List<InstaComment>>> GetPostComments(WebView2 webView, string postId, int commentCount, CancellationTokenSource cancellationToken, EventHandler<List<InstaComment>> taskProgress = null, int retryAttemps = 3)
+        {
+            var requestFilter = "graphql/query";
+            var requestUrl = $"https://www.instagram.com/p/{postId}/comments/";
+            var responseFilterKey = "X-Root-Field-Name".ToLower();
+            var responseFilterValue = "xdt_api__v1__media__media_id__comments__connection".ToLower();
+            var responseFilterValue2 = "xdt_api__v1__web__accounts__get_encrypted_credentials".ToLower();
+            var requestCount = 0;
+            var responseCount = 0;
+            var retryAttempts = 5;
+            var allComments = new List<InstaComment>();
+            var requestCounter = new Dictionary<string, bool>();
+
+            bool IsValidRequest(CoreWebView2WebResourceRequest Request)
+            {
+                var check1 = Request.Uri.Contains(requestFilter);
+                var check2 = Request.Headers.Any(x => x.Key.ToLower() == responseFilterKey && x.Value.ToLower() == responseFilterValue);
+                var check3 = Request.Uri == requestUrl;
+                return (check1 && check2) || check3;
+            }
+
+            async void OnWebResourceRequested(object sender, CoreWebView2WebResourceRequestedEventArgs e)
+            {
+                await Task.Delay(0);
+                if (IsValidRequest(e.Request))
+                {
+                    requestCount++;
+                    var id = Guid.NewGuid().ToString();
+                    e.Request.Headers.SetHeader("x-request-id", id);
+                    requestCounter.Add(id, false);
+                }
+            }
+
+            async void OnWebResourceResponseReceived(object sender, CoreWebView2WebResourceResponseReceivedEventArgs e)
+            {
+                try
+                {
+                    if (!IsValidRequest(e.Request) || e.Response == null) return;
+
+                    var hasRequestId = e.Request.Headers.Any(x => x.Key == "x-request-id");
+                    if (hasRequestId)
+                    {
+                        var header = e.Request.Headers.First(x => x.Key == "x-request-id");
+                        requestCounter[header.Value] = true;
+                    }
+
+                    responseCount++;
+
+                    using (var stream = await e.Response.GetContentAsync())
+                    {
+                        if (stream == null) return;
+                        using (StreamReader reader = new StreamReader(stream, Encoding.UTF8))
+                        {
+                            if (reader == null) return;
+                            var content = await reader.ReadToEndAsync();
+                            if (string.IsNullOrWhiteSpace(content)) return;
+
+                            if (e.Request.Uri == requestUrl)
+                            {
+                                var obj = FindJsonNodeFromScripts(content, responseFilterValue, responseFilterValue);
+                                var edges = (JArray)obj["edges"];
+                                foreach (var edge in edges)
+                                {
+                                    var node = (JObject)edge["node"];
+                                    if (node == null) continue;
+
+                                    var comment = node.ToObject<InstaComment>();
+                                    if (comment == null) continue;
+
+                                    allComments.Add(comment);
+                                }
+                            }
+                            else
+                            {
+                                var root = JObject.Parse(content);
+                                var edges = (JArray)root["data"]?["xdt_api__v1__media__media_id__comments__connection"]?["edges"];
+                                foreach (var edge in edges)
+                                {
+                                    var node = (JObject)edge["node"];
+                                    if (node == null) continue;
+
+                                    var comment = node.ToObject<InstaComment>();
+                                    if (comment == null) continue;
+
+                                    allComments.Add(comment);
+                                }
+                            }
+
+                            taskProgress?.Invoke(webView, allComments);
+                        }
+                    }
+                }
+                catch (Exception)
+                {
+
+                }
+            }
+
+            JObject FindJsonNodeFromScripts(string html, string keyword, string targetKey)
+            {
+                var doc = new HtmlAgilityPack.HtmlDocument();
+                doc.LoadHtml(html);
+
+                var scripts = doc.DocumentNode.SelectNodes("//script[@type='application/json']")?.Where(node => node.InnerText.Contains(keyword));
+
+                if (scripts == null || !scripts.Any()) return null;
+
+                foreach (var script in scripts)
+                {
+                    try
+                    {
+                        var json = JObject.Parse(script.InnerText);
+                        var result = FindNodeByKey(json, targetKey);
+                        if (result != null)
+                            return result;
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("JSON Parse Error: " + ex.Message);
+                    }
+                }
+
+                return null;
+            }
+
+            JObject FindNodeByKey(JToken token, string targetKey)
+            {
+                if (token.Type == JTokenType.Object)
+                {
+                    var obj = (JObject)token;
+                    foreach (var prop in obj.Properties())
+                    {
+                        if (prop.Name == targetKey)
+                            return prop.Value as JObject;
+
+                        var found = FindNodeByKey(prop.Value, targetKey);
+                        if (found != null)
+                            return found;
+                    }
+                }
+                else if (token.Type == JTokenType.Array)
+                {
+                    foreach (var item in (JArray)token)
+                    {
+                        var found = FindNodeByKey(item, targetKey);
+                        if (found != null)
+                            return found;
+                    }
+                }
+
+                return null;
+            }
+
+            try
+            {
+                webView.CoreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
+                webView.CoreWebView2.WebResourceRequested += OnWebResourceRequested;
+                webView.CoreWebView2.WebResourceResponseReceived += OnWebResourceResponseReceived;
+
+                if (webView.Source.ToString() == requestUrl)
+                {
+                    webView.CoreWebView2.Reload();
+                }
+                else
+                {
+                    webView.Source = new Uri(requestUrl);
+                }
+
+                while (true)
+                {
+                    if (requestCounter.Any(x => x.Value == false))
+                    {
+                        retryAttempts = 5;
+                    }
+                    else
+                    {
+                        var scrollDuration = new Random().Next(5, 10);
+                        WebViewHelper.ScrollDownAllDivOnPage(webView, scrollDuration);
+                        retryAttempts--;
+                    }
+
+                    if (cancellationToken.IsCancellationRequested || allComments.Count >= commentCount || retryAttempts <= 0)
+                    {
+                        break;
+                    }
+
+                    await Task.Delay(5000);
+                }
+
+                return new InstaResult<List<InstaComment>>()
+                {
+                    Status = true,
+                    Content = allComments,
+                };
+            }
+            catch (Exception ex)
+            {
+                return new InstaResult<List<InstaComment>>()
+                {
+                    Status = allComments.Count > 0,
+                    Content = allComments,
+                    Errors = ex.GetAllInnerMessages()
+                };
+            }
+            finally
+            {
+                webView.CoreWebView2.WebResourceRequested -= OnWebResourceRequested;
+                webView.CoreWebView2.WebResourceResponseReceived -= OnWebResourceResponseReceived;
+            }
+        }
+    }
+
+    public class InstaUser
+    {
+        public string id { get; set; }
+        public string profile_pic_url { get; set; }
+        public string username { get; set; }
+        public object edge_web_feed_timeline { get; set; }
+    }
+
+    public class WebViewJsExecuteResult
+    {
+        public string Status { get; set; }
+        public string ResultContent { get; set; }
+        public List<string> Errors { get; set; }
+    }
+
+    public class InstaResult<T> where T : class
+    {
+        public bool Status { get; set; }
+        public T Content { get; set; }
+        public WebViewJsExecuteResult JsResult { get; set; }
+        public List<string> Errors { get; set; }
+    }
+
+    public class InstaProfile
+    {
+        public ObjectId ID { get; set; } = ObjectId.NewObjectId();
+        public List<InstaBioLink> bio_links { get; set; }
+        public InstaLinkedFbInfo linked_fb_info { get; set; }
+        public string username { get; set; }
+        public string profile_pic_url { get; set; }
+        public string biography { get; set; }
+        public string full_name { get; set; }
+        public int? follower_count { get; set; }
+        public string address_street { get; set; }
+        public string city_name { get; set; }
+        public bool? is_business { get; set; }
+        public string zip { get; set; }
+        public string category { get; set; }
+        public string external_lynx_url { get; set; }
+        public string external_url { get; set; }
+        public int? following_count { get; set; }
+        public int? media_count { get; set; }
+        public string id { get; set; }
+
+        public bool Validate()
+        {
+            var check1 = !string.IsNullOrEmpty(this.username);
+            var check2 = !string.IsNullOrEmpty(this.category);
+            var check3 = !string.IsNullOrEmpty(this.id);
+
+            return check1 && check2 && check3;
+        }
+    }
+
+    public class InstaBioLink
+    {
+        public string image_url { get; set; }
+        public bool? is_pinned { get; set; }
+        public string link_type { get; set; }
+        public string lynx_url { get; set; }
+        public string media_type { get; set; }
+        public string title { get; set; }
+        public string url { get; set; }
+        public string creation_source { get; set; }
+    }
+
+    public class InstaLinkedFbInfo
+    {
+        public object linked_fb_page { get; set; }
+        public InstaLinkedFbUser linked_fb_user { get; set; }
+    }
+
+    public class InstaLinkedFbUser
+    {
+        public string name { get; set; }
+        public string profile_url { get; set; }
+    }
+
+    public class InstaPost
+    {
+        public string id { get; set; }
+        public string code { get; set; }
+        public InstaCaption caption { get; set; }
+        public string product_type { get; set; }
+        public string organic_tracking_token { get; set; }
+        public long? taken_at { get; set; }
+        public long? comment_count { get; set; }
+        public bool? comments_disabled { get; set; }
+        public long? like_count { get; set; }
+        public int? fb_like_count { get; set; }
+        public InstaPostLocation location { get; set; }
+        public List<IntaTopLiker> facepile_top_likers { get; set; }
+        public List<InstaVideoVersion> video_versions { get; set; }
+        public DateTime? created_at
+        {
+            get
+            {
+
+                return taken_at == null ? null : (DateTime?)DateTimeOffset.FromUnixTimeSeconds(taken_at.Value).UtcDateTime;
+            }
+        }
+    }
+
+    public class InstaCaption
+    {
+        public long? CreatedAt { get; set; }
+        public string Pk { get; set; }
+        public string Text { get; set; }
+    }
+
+    public class InstaPostLocation
+    {
+        public string Pk { get; set; }
+        public double? Lat { get; set; }
+        public double? Lng { get; set; }
+        public string Name { get; set; }
+        public string ProfilePicUrl { get; set; }
+        public string Typename { get; set; }
+    }
+
+    public class IntaTopLiker
+    {
+        public string ProfilePicUrl { get; set; }
+        public string Pk { get; set; }
+        public string Username { get; set; }
+        public string Id { get; set; }
+    }
+
+    public class InstaVideoVersion
+    {
+        public int? Width { get; set; }
+        public int? Height { get; set; }
+        public string Url { get; set; }
+        public int? Type { get; set; }
+    }
+
+    public class InstaComment
+    {
+        public string pk { get; set; }
+        public int? child_comment_count { get; set; }
+        public bool? has_liked_comment { get; set; }
+        public string text { get; set; }
+        public long? created_at { get; set; }
+        public string parent_comment_id { get; set; }
+        public int comment_like_count { get; set; }
+        public InstaCommentUser user { get; set; }
+    }
+
+    public class InstaCommentUser
+    {
+        public string id { get; set; }
+        public string profile_pic_url { get; set; }
+        public string username { get; set; }
+    }
+
+    public class InstFollowing
+    {
+        public string Pk { get; set; }
+        public string PkId { get; set; }
+        public string Id { get; set; }
+        public string FullName { get; set; }
+        public string FbidV2 { get; set; }
+        public int ThirdPartyDownloadsEnabled { get; set; }
+        public string StrongId { get; set; }
+        public string ProfilePicId { get; set; }
+        public string ProfilePicUrl { get; set; }
+        public bool IsVerified { get; set; }
+        public string Username { get; set; }
+        public bool IsPrivate { get; set; }
+        public bool HasAnonymousProfilePicture { get; set; }
+        public List<string> AccountBadges { get; set; }
+        public long LatestReelMedia { get; set; }
+        public bool IsFavorite { get; set; }
+    }
+
+    public class InstaReel
+    {
+        public string id { get; set; }
+        public string reel_type { get; set; }
+        public bool has_besties_media { get; set; }
+        public bool muted { get; set; }
+        public long latest_reel_media { get; set; }
+        public long seen { get; set; }
+        public long expiring_at { get; set; }
+        public int ranked_position { get; set; }
+        public int seen_ranked_position { get; set; }
+        public InstaReelUser user { get; set; }
+        public string __typename { get; set; }
+    }
+
+    public class InstaReelUser
+    {
+        public string pk { get; set; }
+        public string username { get; set; }
+        public string live_broadcast_visibility { get; set; }
+        public string live_broadcast_id { get; set; }
+        public string profile_pic_url { get; set; }
+        public bool? is_unpublished { get; set; }
+        public string id { get; set; }
+        public string hd_profile_pic_url_info { get; set; }
+        public long? latest_reel_media { get; set; }
+        public long? reel_media_seen_timestamp { get; set; }
+    }
+
+
+    ///////////////////////////////////
+
+    public class InstaPostVr2
+    {
+        public string code { get; set; }
+        public string pk { get; set; }
+        public string id { get; set; }
+        public long taken_at { get; set; }
+        public List<InstaVideoVersion> video_versions { get; set; }
+        public InstaImageVersions2 image_versions2 { get; set; }
+        public InstaUserVr2 user { get; set; }
+        public string product_type { get; set; }
+        public InstaUserTags usertags { get; set; }
+        public InstaLocation location { get; set; }
+        public int like_count { get; set; }
+        public InstaOwner owner { get; set; }
+        public int comment_count { get; set; }
+        public List<string> top_likers { get; set; }
+        public int fb_like_count { get; set; }
+        public InstaCaption caption { get; set; }
+    }
+
+    public class InstaImageVersions2
+    {
+        public List<InstaCandidate> candidates { get; set; }
+    }
+
+    public class InstaCandidate
+    {
+        public string url { get; set; }
+        public int height { get; set; }
+        public int width { get; set; }
+    }
+
+    public class InstaUserVr2
+    {
+        public string pk { get; set; }
+        public string username { get; set; }
+        public string full_name { get; set; }
+        public string profile_pic_url { get; set; }
+        public bool is_private { get; set; }
+        public bool is_embeds_disabled { get; set; }
+        public bool is_unpublished { get; set; }
+        public bool is_verified { get; set; }
+        public InstaFriendshipStatus friendship_status { get; set; }
+        public int latest_reel_media { get; set; }
+        public string id { get; set; }
+        public string __typename { get; set; }
+        public object live_broadcast_visibility { get; set; }
+        public object live_broadcast_id { get; set; }
+        public InstaHdProfilePicUrlInfo hd_profile_pic_url_info { get; set; }
+    }
+
+    public class InstaFriendshipStatus
+    {
+        public object blocking { get; set; }
+        public bool followed_by { get; set; }
+        public bool following { get; set; }
+        public object incoming_request { get; set; }
+        public bool is_private { get; set; }
+        public bool is_restricted { get; set; }
+        public object is_viewer_unconnected { get; set; }
+        public object muting { get; set; }
+        public object outgoing_request { get; set; }
+        public object subscribed { get; set; }
+        public bool is_feed_favorite { get; set; }
+    }
+
+    public class InstaHdProfilePicUrlInfo
+    {
+        public string url { get; set; }
+    }
+
+    public class InstaUserTags
+    {
+        public List<InstaUserTagIn> @in { get; set; }
+    }
+
+    public class InstaUserTagIn
+    {
+        public InstaTaggedUser user { get; set; }
+        public List<int> position { get; set; }
+    }
+
+    public class InstaTaggedUser
+    {
+        public string pk { get; set; }
+        public string full_name { get; set; }
+        public string username { get; set; }
+        public string profile_pic_url { get; set; }
+        public bool is_verified { get; set; }
+        public string id { get; set; }
+    }
+
+    public class InstaLocation
+    {
+        public long pk { get; set; }
+        public double lat { get; set; }
+        public double lng { get; set; }
+        public string name { get; set; }
+        public object profile_pic_url { get; set; }
+        public string __typename { get; set; }
+    }
+
+    public class InstaOwner
+    {
+        public string pk { get; set; }
+        public string id { get; set; }
+        public string username { get; set; }
+        public string profile_pic_url { get; set; }
+        public bool show_account_transparency_details { get; set; }
+        public string __typename { get; set; }
+        public bool is_private { get; set; }
+        public object transparency_product { get; set; }
+        public bool transparency_product_enabled { get; set; }
+        public object transparency_label { get; set; }
+        public object ai_agent_owner_username { get; set; }
+        public bool is_unpublished { get; set; }
+        public bool is_verified { get; set; }
+    }
+
+
+    ///////////////////////////////////
+
+    public class InstaPostProgressArgs<T> where T : class
+    {
+        public string Message { get; set; }
+        public List<T> Data { get; set; }
+        public bool BreakLoop { get; set; }
+        public int BreakLoopWait { get; set; }
+    }
+}
