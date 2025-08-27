@@ -66,7 +66,8 @@ namespace SocialMediaDataScraper
 
             await webView.EnsureCoreWebView2Async(environment);
             webView.ZoomFactor = 1;
-            webView.CoreWebView2.Settings.UserAgent = dsBrowser.UserAgent;
+            //webView.CoreWebView2.Settings.UserAgent = dsBrowser.UserAgent;
+            webView.CoreWebView2.Settings.UserAgent = @"Mozilla/5.0 (iPhone; CPU iPhone OS 18_6_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.4 Mobile/15E148 Safari/604.1";
             webView.Source = new Uri("https://www.instagram.com");
         }
 
@@ -101,6 +102,18 @@ namespace SocialMediaDataScraper
         private void btn_zoomOut_Click(object sender, EventArgs e)
         {
             webView.ZoomFactor -= 0.10;
+        }
+
+        private void btn_back_Click(object sender, EventArgs e)
+        {
+            if (webView.CoreWebView2 == null || !webView.CoreWebView2.CanGoBack) return;
+            webView.CoreWebView2.GoBack();
+        }
+
+        private void btn_forward_Click(object sender, EventArgs e)
+        {
+            if (webView.CoreWebView2 == null || !webView.CoreWebView2.CanGoForward) return;
+            webView.CoreWebView2.GoForward();
         }
     }
 }

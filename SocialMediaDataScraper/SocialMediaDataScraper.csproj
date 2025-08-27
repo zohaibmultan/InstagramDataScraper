@@ -25,6 +25,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="Javascripts\AjaxGetFollowings.js">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="Javascripts\HumanClick.js">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

@@ -1,5 +1,7 @@
 ﻿#nullable disable
 
+using System.Dynamic;
+
 namespace SocialMediaDataScraper.Models
 {
     public static class ExceptionExtensions
@@ -15,6 +17,25 @@ namespace SocialMediaDataScraper.Models
             }
 
             return messages;
+        }
+    }
+
+    public static class ObjectExtensions
+    {
+        public static ExpandoObject ToExpando(this object obj)
+        {
+            if (obj == null)
+                throw new ArgumentNullException(nameof(obj));
+
+            var expando = new ExpandoObject();
+            var dict = (IDictionary<string, object?>)expando;
+
+            foreach (var property in obj.GetType().GetProperties())
+            {
+                dict[property.Name] = property.GetValue(obj);
+            }
+
+            return expando;
         }
     }
 }

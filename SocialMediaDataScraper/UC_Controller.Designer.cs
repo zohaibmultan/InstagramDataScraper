@@ -104,6 +104,7 @@
             // btn_stopCommand
             // 
             btn_stopCommand.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btn_stopCommand.Enabled = false;
             btn_stopCommand.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
             btn_stopCommand.Location = new Point(697, 4);
             btn_stopCommand.Name = "btn_stopCommand";

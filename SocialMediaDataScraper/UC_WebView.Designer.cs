@@ -36,6 +36,8 @@
             btn_zoomOut = new Button();
             btn_zoomIn = new Button();
             tb_status = new TextBox();
+            btn_back = new Button();
+            btn_forward = new Button();
             ((System.ComponentModel.ISupportInitialize)webView).BeginInit();
             SuspendLayout();
             // 
@@ -45,13 +47,13 @@
             tb_addressBar.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
             tb_addressBar.Location = new Point(3, 6);
             tb_addressBar.Name = "tb_addressBar";
-            tb_addressBar.Size = new Size(337, 25);
+            tb_addressBar.Size = new Size(518, 25);
             tb_addressBar.TabIndex = 0;
             // 
             // btn_refresh
             // 
             btn_refresh.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
-            btn_refresh.Location = new Point(44, 37);
+            btn_refresh.Location = new Point(126, 37);
             btn_refresh.Name = "btn_refresh";
             btn_refresh.Size = new Size(35, 30);
             btn_refresh.TabIndex = 2;
@@ -62,7 +64,7 @@
             // btn_go
             // 
             btn_go.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
-            btn_go.Location = new Point(3, 37);
+            btn_go.Location = new Point(85, 37);
             btn_go.Name = "btn_go";
             btn_go.Size = new Size(35, 30);
             btn_go.TabIndex = 1;
@@ -73,7 +75,7 @@
             // btn_devTool
             // 
             btn_devTool.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
-            btn_devTool.Location = new Point(85, 37);
+            btn_devTool.Location = new Point(167, 37);
             btn_devTool.Name = "btn_devTool";
             btn_devTool.Size = new Size(35, 30);
             btn_devTool.TabIndex = 3;
@@ -89,14 +91,14 @@
             webView.DefaultBackgroundColor = Color.White;
             webView.Location = new Point(3, 73);
             webView.Name = "webView";
-            webView.Size = new Size(337, 263);
+            webView.Size = new Size(518, 263);
             webView.TabIndex = 11;
             webView.ZoomFactor = 1D;
             // 
             // btn_zoomOut
             // 
             btn_zoomOut.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
-            btn_zoomOut.Location = new Point(167, 37);
+            btn_zoomOut.Location = new Point(249, 37);
             btn_zoomOut.Name = "btn_zoomOut";
             btn_zoomOut.Size = new Size(35, 30);
             btn_zoomOut.TabIndex = 5;
@@ -107,7 +109,7 @@
             // btn_zoomIn
             // 
             btn_zoomIn.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
-            btn_zoomIn.Location = new Point(126, 37);
+            btn_zoomIn.Location = new Point(208, 37);
             btn_zoomIn.Name = "btn_zoomIn";
             btn_zoomIn.Size = new Size(35, 30);
             btn_zoomIn.TabIndex = 4;
@@ -119,12 +121,34 @@
             // 
             tb_status.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             tb_status.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
-            tb_status.Location = new Point(242, 40);
+            tb_status.Location = new Point(423, 40);
             tb_status.Name = "tb_status";
             tb_status.ReadOnly = true;
             tb_status.Size = new Size(98, 25);
             tb_status.TabIndex = 10;
             tb_status.TextAlign = HorizontalAlignment.Center;
+            // 
+            // btn_back
+            // 
+            btn_back.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
+            btn_back.Location = new Point(3, 37);
+            btn_back.Name = "btn_back";
+            btn_back.Size = new Size(35, 30);
+            btn_back.TabIndex = 1;
+            btn_back.Text = "<";
+            btn_back.UseVisualStyleBackColor = true;
+            btn_back.Click += btn_back_Click;
+            // 
+            // btn_forward
+            // 
+            btn_forward.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
+            btn_forward.Location = new Point(44, 37);
+            btn_forward.Name = "btn_forward";
+            btn_forward.Size = new Size(35, 30);
+            btn_forward.TabIndex = 1;
+            btn_forward.Text = ">";
+            btn_forward.UseVisualStyleBackColor = true;
+            btn_forward.Click += btn_forward_Click;
             // 
             // UC_WebView
             // 
@@ -136,11 +160,13 @@
             Controls.Add(webView);
             Controls.Add(tb_addressBar);
             Controls.Add(btn_refresh);
+            Controls.Add(btn_forward);
+            Controls.Add(btn_back);
             Controls.Add(btn_go);
             Controls.Add(btn_devTool);
             Font = new Font("Segoe UI", 9.75F, FontStyle.Regular, GraphicsUnit.Point, 0);
             Name = "UC_WebView";
-            Size = new Size(343, 339);
+            Size = new Size(524, 339);
             Load += UC_WebView_Load;
             ((System.ComponentModel.ISupportInitialize)webView).EndInit();
             ResumeLayout(false);
@@ -157,5 +183,7 @@
         private Button btn_zoomOut;
         private Button btn_zoomIn;
         private TextBox tb_status;
+        private Button btn_back;
+        private Button btn_forward;
     }
 }
