@@ -7,6 +7,7 @@ using SocialMediaDataScraper.Common;
 using SocialMediaDataScraper.Models;
 using System.Collections;
 using System.ComponentModel;
+using System.Threading;
 
 namespace SocialMediaDataScraper
 {
@@ -335,38 +336,36 @@ namespace SocialMediaDataScraper
         private async Task GetFollowingsAjax()
         {
             var cancellationToken = new CancellationTokenSource();
+            EventHandler canellationEvent = (sender, e) => CancelRunningTask(cancellationToken);
             var (res, query) = ShowQueryDialog<QueryFollowingAjax>();
             if (res != DialogResult.OK) return;
 
-            void TaskCancel(object sender, EventArgs e)
-            {
-                var ans = MessageBox.Show("Do you want to cancel the task?", "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                if (ans != DialogResult.Yes) return;
-                cancellationToken.Cancel();
-            }
-
             Log(DS_BrowserLogType.Info, $"-------- GET FOLLOWINGS --------");
-            btn_stopCommand.Click += TaskCancel;
+            btn_stopCommand.Click += canellationEvent;
 
             Log(DS_BrowserLogType.Info, $"Getting followings {query.Username}...");
             var data = await InstaHelper.GetFollowingsAjax(
-                webView,
                 query.UserPK.ToString(),
                 query.Username,
-                cancellationToken,
-                query.RecordsCount,
-                query.MinWait,
-                query.MaxWait,
-                (s, e) =>
+                new InstaBulkTaskParams<InstaFollowing>()
                 {
-                    Log(DS_BrowserLogType.Info, e.Message);
-                    if (e.BreakLoop) BreakLoop(e.BreakLoopWait);
-                },
-                query.LoopBreak
+                    WebView = webView,
+                    CancellationToken = cancellationToken,
+                    RecordsCount = query.RecordsCount,
+                    MinWait = query.MinWait,
+                    MaxWait = query.MaxWait,
+                    TaskProgress = (s, e) =>
+                    {
+                        Log(DS_BrowserLogType.Info, e.Message);
+                        if (e.BreakLoop) BreakLoop(e.BreakLoopWait);
+                    },
+                    LoopBreakAttempts = query.LoopBreak,
+                    FailedAttempts = 3,
+                }
             );
             SaveData<List<InstaFollowing>, InstaFollowing>(data);
 
-            btn_stopCommand.Click -= TaskCancel;
+            btn_stopCommand.Click -= canellationEvent;
             Log(DS_BrowserLogType.Info, $"-------- GET FOLLOWINGS END --------");
         }
 
@@ -548,6 +547,13 @@ namespace SocialMediaDataScraper
             }
 
             Log(success ? DS_BrowserLogType.Info : DS_BrowserLogType.Error, success ? "Following data saved" : "Unable to save following data");
+        }
+
+        private void CancelRunningTask(CancellationTokenSource cancellationToken)
+        {
+            var ans = MessageBox.Show("Do you want to cancel the task?", "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (ans != DialogResult.Yes) return;
+            cancellationToken.Cancel();
         }
     }
 }

@@ -1,6 +1,9 @@
 ﻿#nullable disable
 
+using Microsoft.VisualBasic.ApplicationServices;
+using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement.StartPanel;
 
 namespace SocialMediaDataScraper.Models
 {
@@ -184,5 +187,27 @@ namespace SocialMediaDataScraper.Models
             }
         }
 
+
+        private static EventHandler<CoreWebView2WebMessageReceivedEventArgs> handler;
+
+        public static async Task<(bool, string)> ExecuteScriptForResult(WebView2 webView, string script)
+        {
+            if (webView.CoreWebView2 == null) return (false, "WebView2 is null");
+
+            var tcs = new TaskCompletionSource<(bool, string)>();
+
+            handler = (s, e) =>
+            {
+                var result = e.WebMessageAsJson;
+                webView.CoreWebView2.WebMessageReceived -= handler;
+                tcs.TrySetResult((true, result));
+            };
+
+            webView.CoreWebView2.WebMessageReceived += handler;
+
+            await webView.ExecuteScriptAsync(script);
+
+            return await tcs.Task;
+        }
     }
 }

@@ -16,20 +16,19 @@
             },
             credentials: 'include'
         });
-        const data = {
+
+        window.chrome.webview.postMessage({
             status: true,
             requestId: requestId,
             data: await response.json()
-        };
-        //const json = JSON.stringify(data);
-        window.chrome.webview.postMessage(data);
+        });
     }
     catch (error) {
-        window.chrome.webview.postMessage(JSON.stringify({
+        window.chrome.webview.postMessage({
             status: false,
             questId: requestId,
             error: error.message
-        }));
+        });
     }
 }
 

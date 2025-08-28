@@ -1,16 +1,29 @@
 ﻿#nullable disable
+
 using LiteDB;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Text;
-using System.Xml.Linq;
 
 namespace SocialMediaDataScraper.Models
 {
     public static class InstaHelper
     {
+        private static Random random = new Random();
+
+        private static (bool, string) GetScriptFromFile(string scriptFileName)
+        {
+            var scriptPath = Path.Combine(WebViewHelper.ScriptDirectory, scriptFileName);
+            if (!Path.Exists(scriptPath)) return (false, $"{scriptFileName} not found");
+
+            var scriptText = File.ReadAllText(scriptPath);
+            if (string.IsNullOrEmpty(scriptText)) return(false, $"{scriptFileName} is empty");
+
+            return (true,  scriptText);
+        }
+
         private static async Task<WebViewJsExecuteResult> ExecuteJsAsync(WebView2 webView, string jsCode, int waitInSeconds = 15)
         {
             var tcs = new TaskCompletionSource<WebViewJsExecuteResult>();
@@ -668,6 +681,8 @@ namespace SocialMediaDataScraper.Models
                         Message = $"Wait for {timeWait} seconds...",
                     });
 
+                    if (followings.Count >= followingCount) break;
+
                     await Task.Delay(TimeSpan.FromSeconds(timeWait), cancellationToken.Token);
                 }
 
@@ -693,132 +708,141 @@ namespace SocialMediaDataScraper.Models
             }
         }
 
-        public static async Task<InstaResult<List<InstaFollowing>>> GetFollowingsAjax(WebView2 webView, string userPk, string username, CancellationTokenSource cancellationToken, int followingCount = 0, int minWait = 5, int maxWait = 15, EventHandler<InstaPostProgressArgs<InstaFollowing>> taskProgress = null, int loopBreakAttemps = 3)
+        public static async Task<InstaResult<List<InstaFollowing>>> GetFollowingsAjax(string userPk, string username, InstaBulkTaskParams<InstaFollowing> taskParams)
         {
             var scriptName = "AjaxGetFollowings.js";
-            var scriptPath = Path.Combine(WebViewHelper.ScriptDirectory, scriptName);
-            var random = new Random();
-            var attempts = loopBreakAttemps;
-            var requests = new Dictionary<string, bool>();
-            var followings = new List<InstaFollowing>();
-            var callingIndex = 0;
+            var collection = new List<InstaFollowing>();
+            var successAttempts = 0;
+            var failedAttempts = 0;
+            var hasMore = false;
+            var nextMaxId = 0;
 
-            async Task CallAjax()
+            void SendTaskProgress(string message, bool breakLoop = false, int breakLoopWait = 0)
             {
-                var requestId = Guid.NewGuid().ToString();
-                requests.Add(requestId, false);
-
-                var call = callingIndex > 0 ? 
-                    $"fetchFollowing('{requestId}','{userPk}','{username}', {callingIndex * 12})" : 
-                    $"fetchFollowing('{requestId}','{userPk}','{username}')";
-
-                await webView.ExecuteScriptAsync(call);
-
-                callingIndex++;
-            }
-
-            void CoreWebView2_WebMessageReceived(object sender, CoreWebView2WebMessageReceivedEventArgs e)
-            {
-                var message = e.WebMessageAsJson;
-
-                var key = requests.Where(x => !x.Value && message.Contains(x.Key)).Select(x => x.Key).FirstOrDefault();
-                if (string.IsNullOrEmpty(key)) return;
-                requests[key] = true;
-
-                var root = JObject.Parse(message);
-                var users = (JArray)root["data"]?["users"];
-                if (users == null) return;
-
-                foreach (var user in users)
+                taskParams.TaskProgress?.Invoke(taskParams.WebView, new InstaPostProgressArgs<InstaFollowing>()
                 {
-                    var node = (JObject)user;
-                    if (node == null) continue;
-
-                    var item = node.ToObject<InstaFollowing>();
-                    if (item == null) continue;
-
-                    followings.Add(item);
-                }
-
-                taskProgress?.Invoke(webView, new InstaPostProgressArgs<InstaFollowing>()
-                {
-                    Message = $"{followings.Count} records collected, attempts remaining {attempts}",
+                    Message = message,
+                    BreakLoop = breakLoop,
+                    BreakLoopWait = breakLoopWait
                 });
             }
 
-            if (!Path.Exists(scriptPath))
+            void ProcessAjaxResult(bool resultStatus, string result)
             {
-                return new InstaResult<List<InstaFollowing>>()
+                if (!resultStatus)
                 {
-                    Status = false,
-                    Content = followings,
-                    Errors = [$"{scriptName} not found"]
-                };
+                    failedAttempts++;
+                    SendTaskProgress(result);
+                    return;
+                }
+
+                var root = JObject.Parse(result);
+                if (root == null)
+                {
+                    failedAttempts++;
+                    SendTaskProgress($"Root object is null, failed attempts {failedAttempts}");
+                    return;
+                }
+
+                var status = root["status"]?.Value<bool>();
+                if (status != true)
+                {
+                    failedAttempts++;
+                    var error = root["error"]?.Value<string>();
+                    SendTaskProgress($"{error ?? "Unknown error"}, {failedAttempts}");
+                    return;
+                }
+
+                var users = (JArray)root["data"]?["users"];
+                if (users == null)
+                {
+                    failedAttempts++;
+                    SendTaskProgress($"Unable to find users, {failedAttempts}");
+                    return;
+                }
+
+                hasMore = root["data"]?["has_more"]?.Value<bool>() ?? false;
+                nextMaxId = root["data"]?["next_max_id"]?.Value<int>() ?? 0;
+                var list = new List<InstaFollowing>();
+
+                foreach (var user in users)
+                {
+                    try
+                    {
+                        var item = (user as JObject)?.ToObject<InstaFollowing>();
+                        if (item == null) continue;
+
+                        list.Add(item);
+                    }
+                    catch (Exception)
+                    { }
+                }
+
+                successAttempts++;
+                collection.AddRange(list);
+                SendTaskProgress($"{list.Count}/{collection.Count}/{taskParams.RecordsCount} records collected, attempt {successAttempts}");
             }
 
-            var scriptText = await File.ReadAllTextAsync(scriptPath);
-            if (string.IsNullOrEmpty(scriptText))
+            async Task CallAjaxAsync()
             {
-                return new InstaResult<List<InstaFollowing>>()
-                {
-                    Status = false,
-                    Content = followings,
-                    Errors = [$"{scriptName} is empty"]
-                };
+                var requestId = Guid.NewGuid().ToString();
+                var script = nextMaxId == 0 ?
+                    $"fetchFollowing('{requestId}','{userPk}','{username}')" :
+                    $"fetchFollowing('{requestId}','{userPk}','{username}', {nextMaxId})";
+
+                var (status, result) = await WebViewHelper.ExecuteScriptForResult(taskParams.WebView, script);
+                ProcessAjaxResult(status, result);
             }
 
             try
             {
-                await webView.ExecuteScriptAsync(scriptText);
-                webView.CoreWebView2.WebMessageReceived += CoreWebView2_WebMessageReceived;
-                
-                while (!cancellationToken.IsCancellationRequested && followings.Count < followingCount)
+                var (status, scriptText) = GetScriptFromFile(scriptName);
+                if(!status)
                 {
-                    if (attempts == 0)
+                    return new InstaResult<List<InstaFollowing>>()
                     {
-                        var wait = random.Next(15, 30);
-                        attempts = loopBreakAttemps;
+                        Status = false,
+                        Content = collection,
+                        Errors = [$"{scriptName} not found"]
+                    };
+                }
 
-                        taskProgress?.Invoke(webView, new InstaPostProgressArgs<InstaFollowing>()
-                        {
-                            Message = $"Break loop wait for {wait} seconds...",
-                            BreakLoop = true,
-                            BreakLoopWait = random.Next(60, 180)
-                        });
-                        await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken.Token);
+                await taskParams.WebView.ExecuteScriptAsync(scriptText);
 
+                while (!taskParams.CancellationToken.IsCancellationRequested)
+                {
+                    await CallAjaxAsync();
+
+                    if (hasMore == false) break;
+                    if (collection.Count >= taskParams.RecordsCount) break;
+                    if (failedAttempts == taskParams.FailedAttempts) break;
+                    if (successAttempts % taskParams.LoopBreakAttempts == 0)
+                    {
+                        var wait = random.Next(15, 60);
+                        SendTaskProgress($"Break loop wait for {wait} seconds...", true, wait);
+                        await Task.Delay(TimeSpan.FromSeconds(wait), taskParams.CancellationToken.Token);
                         continue;
                     }
 
-                    await CallAjax();
-
-                    var timeWait = random.Next(minWait, maxWait);
-                    taskProgress?.Invoke(webView, new InstaPostProgressArgs<InstaFollowing>()
-                    {
-                        Message = $"Wait for {timeWait} seconds...",
-                    });
-
-                    await Task.Delay(TimeSpan.FromSeconds(timeWait), cancellationToken.Token);
+                    var timeWait = random.Next(taskParams.MinWait, taskParams.MaxWait);
+                    SendTaskProgress($"Wait for {timeWait} seconds...");
+                    await Task.Delay(TimeSpan.FromSeconds(timeWait), taskParams.CancellationToken.Token);
                 }
 
                 return new InstaResult<List<InstaFollowing>>()
                 {
                     Status = true,
-                    Content = followings,
+                    Content = collection,
                 };
             }
             catch (Exception ex)
             {
                 return new InstaResult<List<InstaFollowing>>()
                 {
-                    Status = followings.Count > 0,
-                    Content = followings,
+                    Status = collection.Count > 0,
+                    Content = collection,
                     Errors = ex.GetAllInnerMessages()
                 };
-            }
-            finally
-            {
-                webView.CoreWebView2.WebMessageReceived -= CoreWebView2_WebMessageReceived;
             }
         }
 
@@ -1361,5 +1385,17 @@ namespace SocialMediaDataScraper.Models
         public List<T> Data { get; set; }
         public bool BreakLoop { get; set; }
         public int BreakLoopWait { get; set; }
+    }
+
+    public class InstaBulkTaskParams<T> where T : class, new()
+    {
+        public WebView2 WebView { get; set; }
+        public CancellationTokenSource CancellationToken { get; set; }
+        public int RecordsCount { get; set; } = 0;
+        public int MinWait { get; set; } = 5;
+        public int MaxWait { get; set; } = 15;
+        public EventHandler<InstaPostProgressArgs<T>> TaskProgress { get; set; }
+        public int LoopBreakAttempts { get; set; } = 3;
+        public int FailedAttempts { get; set; } = 3;
     }
 }
