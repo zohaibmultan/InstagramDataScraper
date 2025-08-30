@@ -15,7 +15,7 @@ namespace SocialMediaDataScraper.Common
     {
         private static string databaseName = @"Filename=D:\04_Practice\SocialMediaDataScraper\SocialMediaDataScraper\database.db;Connection=shared";
 
-        public static bool Save<T>(T model, Expression<Func<T, bool>> condition = null) where T : class
+        public static T SaveOne<T>(T model, Expression<Func<T, bool>> condition = null) where T : class
         {
             using var db = new LiteDatabase(databaseName);
             var col = db.GetCollection<T>();
@@ -25,27 +25,16 @@ namespace SocialMediaDataScraper.Common
                 var existing = col.FindOne(condition);
                 if (existing != null)
                 {
-                    // update -> preserve Id
-                    var idProp = typeof(T).GetProperties().FirstOrDefault(p => Attribute.IsDefined(p, typeof(BsonIdAttribute)) || p.Name.Equals("Id", StringComparison.OrdinalIgnoreCase));
-
-                    if (idProp != null)
-                    {
-                        var idVal = idProp.GetValue(existing);
-                        if (idVal != null)
-                        {
-                            idProp.SetValue(model, idVal);
-                        }
-                    }
-
-                    return col.Update(model);
+                    CopyProperties<T>(model, existing);
+                    return col.Update(existing) ? existing : null;
                 }
             }
 
             var res = col.Insert(model);
-            return res != null;
+            return res == null ? null : model;
         }
 
-        public static bool SaveMany<T>(List<T> models, Expression<Func<T, bool>>? condition = null) where T : class
+        public static bool SaveMany<T>(List<T> models, Expression<Func<T, bool>> condition = null) where T : class
         {
             using var db = new LiteDatabase(databaseName);
             var col = db.GetCollection<T>();
@@ -59,18 +48,7 @@ namespace SocialMediaDataScraper.Common
                     var existing = col.FindOne(condition);
                     if (existing != null)
                     {
-                        var idProp = typeof(T).GetProperties()
-                                              .FirstOrDefault(p => Attribute.IsDefined(p, typeof(BsonIdAttribute)) || p.Name.Equals("Id", StringComparison.OrdinalIgnoreCase));
-
-                        if (idProp != null)
-                        {
-                            var idVal = idProp.GetValue(existing);
-                            if (idVal != null)
-                            {
-                                idProp.SetValue(model, idVal);
-                            }
-                        }
-
+                        CopyProperties<T>(model, existing);
                         anySaved |= col.Update(model);
                         continue;
                     }
@@ -83,6 +61,39 @@ namespace SocialMediaDataScraper.Common
             return anySaved;
         }
 
+        public static bool UpdateOne<T>(T model, Expression<Func<T, bool>> condition = null) where T : class
+        {
+            using var db = new LiteDatabase(databaseName);
+            var col = db.GetCollection<T>();
+            return col.Update(model);
+        }
+
+        public static bool UpdateMany<T>(List<T> models, Expression<Func<T, bool>> condition = null) where T : class
+        {
+            using var db = new LiteDatabase(databaseName);
+            var col = db.GetCollection<T>();
+
+            int updatedCount = 0;
+
+            if (condition == null)
+            {
+                foreach (var model in models)
+                {
+                    if (col.Update(model)) updatedCount++;
+                }
+            }
+            else
+            {
+                var existing = col.Find(condition).ToList();
+                foreach (var model in models)
+                {
+                    if (existing.Any(x => x.Equals(model)) && col.Update(model)) updatedCount++;
+                }
+            }
+
+            return updatedCount == models.Count;
+        }
+
         public static bool Delete<T>(ObjectId id) where T : class
         {
             using var db = new LiteDatabase(databaseName);
@@ -90,11 +101,44 @@ namespace SocialMediaDataScraper.Common
             return col.Delete(id);
         }
 
-        public static List<T> GetAll<T>()
+        public static bool DeleteMany<T>(Expression<Func<T, bool>> condition) where T : class
+        {
+            using var db = new LiteDatabase(databaseName);
+            var col = db.GetCollection<T>();
+            var res = col.DeleteMany(condition);
+            return res >= 0;
+        }
+
+        public static List<T> GetAll<T>() where T : class
         {
             using var db = new LiteDatabase(databaseName);
             var col = db.GetCollection<T>();
             return col.FindAll().ToList();
+        }
+
+        public static T GetOne<T>(Expression<Func<T, bool>> condition) where T : class
+        {
+            using var db = new LiteDatabase(databaseName);
+            var col = db.GetCollection<T>();
+            return col.FindOne(condition);
+        }
+
+        public static List<T> Get<T>(Expression<Func<T, bool>> condition) where T : class
+        {
+            using var db = new LiteDatabase(databaseName);
+            var col = db.GetCollection<T>();
+            return col.Find(condition).ToList();
+        }
+
+        public static void CopyProperties<T>(T source, T target) where T : class
+        {
+            var props = typeof(T).GetProperties().Where(p => p.CanRead && p.CanWrite && p.Name != "_id");
+
+            foreach (var prop in props)
+            {
+                var value = prop.GetValue(source, null);
+                prop.SetValue(target, value, null);
+            }
         }
     }
 

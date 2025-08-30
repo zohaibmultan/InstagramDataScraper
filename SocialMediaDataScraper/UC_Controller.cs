@@ -120,8 +120,8 @@ namespace SocialMediaDataScraper
                 var jsonData = JsonConvert.SerializeObject(data.Content, Formatting.Indented);
                 Log(DS_BrowserLogType.Info, $"Profile data collected, Double click to view", content: jsonData);
 
-                var ans = DbHelper.Save<InstaProfile>(data.Content);
-                Log(ans ? DS_BrowserLogType.Info : DS_BrowserLogType.Error, ans ? "Profile data saved" : "Unable to save profile data");
+                var model = DbHelper.SaveOne<InstaProfile>(data.Content);
+                Log(model != null ? DS_BrowserLogType.Info : DS_BrowserLogType.Error, model != null ? "Profile data saved" : "Unable to save profile data");
             }
             else if (data != null && !data.Status)
             {
@@ -162,8 +162,8 @@ namespace SocialMediaDataScraper
                 var jsonData = JsonConvert.SerializeObject(data.Content, Formatting.Indented);
                 Log(DS_BrowserLogType.Info, $"Post data collected, Double click to view", content: jsonData);
 
-                var ans = DbHelper.Save<InstaPostVr2>(data.Content);
-                Log(ans ? DS_BrowserLogType.Info : DS_BrowserLogType.Error, ans ? "Post data saved" : "Unable to save post data");
+                var model = DbHelper.SaveOne<InstaPostVr2>(data.Content);
+                Log(model != null ? DS_BrowserLogType.Info : DS_BrowserLogType.Error, model != null ? "Post data saved" : "Unable to save post data");
             }
             else if (data != null && !data.Status)
             {
@@ -530,7 +530,7 @@ namespace SocialMediaDataScraper
             var jsonData = JsonConvert.SerializeObject(data.Content, Formatting.Indented);
             Log(DS_BrowserLogType.Info, $"Following data collected, Double click to view", content: jsonData);
 
-            bool success;
+            var success = false;
             if (data.Content is IList list)
             {
                 var castedList = list.Cast<T2>().ToList();
@@ -538,7 +538,8 @@ namespace SocialMediaDataScraper
             }
             else if (data.Content is T1 obj)
             {
-                success = DbHelper.Save(obj);
+                var res = DbHelper.SaveOne(obj);
+                success = res != null;
             }
             else
             {

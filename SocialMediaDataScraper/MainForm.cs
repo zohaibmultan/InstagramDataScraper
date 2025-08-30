@@ -60,7 +60,7 @@ namespace SocialMediaDataScraper
 
             if (new PropertyForm("Add New Browser", model).ShowDialog() != DialogResult.OK) return;
 
-            if (!DbHelper.Save<DS_Browser>(model)) return;
+            if (DbHelper.SaveOne<DS_Browser>(model) == null) return;
 
             browsers.Add(model);
             gv_browsers.Refresh();

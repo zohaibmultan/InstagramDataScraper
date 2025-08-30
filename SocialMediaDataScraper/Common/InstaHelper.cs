@@ -1062,8 +1062,12 @@ namespace SocialMediaDataScraper.Models
         }
     }
 
+    ////////////////////////////////////////////////
+
     public class InstaUser
     {
+        [BsonId]
+        public ObjectId _id { get; set; }
         public string id { get; set; }
         public string profile_pic_url { get; set; }
         public string username { get; set; }
@@ -1085,26 +1089,29 @@ namespace SocialMediaDataScraper.Models
         public List<string> Errors { get; set; }
     }
 
+    ////////////////////////////////////////////////
+
     public class InstaProfile
     {
-        public ObjectId ID { get; set; } = ObjectId.NewObjectId();
-        public List<InstaBioLink> bio_links { get; set; }
-        public InstaLinkedFbInfo linked_fb_info { get; set; }
+        [BsonId]
+        public ObjectId _id { get; set; }
+        public string id { get; set; }
         public string username { get; set; }
         public string profile_pic_url { get; set; }
-        public string biography { get; set; }
         public string full_name { get; set; }
+        public string category { get; set; }
         public int? follower_count { get; set; }
+        public int? following_count { get; set; }
+        public int? media_count { get; set; }
+        public List<InstaBioLink> bio_links { get; set; }
+        public InstaLinkedFbInfo linked_fb_info { get; set; }
+        public string biography { get; set; }
         public string address_street { get; set; }
         public string city_name { get; set; }
         public bool? is_business { get; set; }
         public string zip { get; set; }
-        public string category { get; set; }
         public string external_lynx_url { get; set; }
         public string external_url { get; set; }
-        public int? following_count { get; set; }
-        public int? media_count { get; set; }
-        public string id { get; set; }
 
         public bool Validate()
         {
@@ -1140,8 +1147,12 @@ namespace SocialMediaDataScraper.Models
         public string profile_url { get; set; }
     }
 
+    ////////////////////////////////////////////////
+
     public class InstaPost
     {
+        [BsonId]
+        public ObjectId _id { get; set; }
         public string id { get; set; }
         public string code { get; set; }
         public InstaCaption caption { get; set; }
@@ -1198,6 +1209,8 @@ namespace SocialMediaDataScraper.Models
         public int? Type { get; set; }
     }
 
+    ////////////////////////////////////////////////
+
     public class InstaComment
     {
         public string pk { get; set; }
@@ -1217,16 +1230,24 @@ namespace SocialMediaDataScraper.Models
         public string username { get; set; }
     }
 
+    ////////////////////////////////////////////////
+
     public class InstaFollowing
     {
+        [BsonId]
+        public ObjectId _id { get; set; }
         public string pk { get; set; }
         public string full_name { get; set; }
         public string profile_pic_url { get; set; }
         public string username { get; set; }
     }
 
+    ////////////////////////////////////////////////
+
     public class InstaReel
     {
+        [BsonId]
+        public ObjectId _id { get; set; }
         public string id { get; set; }
         public string reel_type { get; set; }
         public bool has_besties_media { get; set; }
@@ -1253,7 +1274,6 @@ namespace SocialMediaDataScraper.Models
         public long? latest_reel_media { get; set; }
         public long? reel_media_seen_timestamp { get; set; }
     }
-
 
     ///////////////////////////////////
 
@@ -1376,7 +1396,6 @@ namespace SocialMediaDataScraper.Models
         public bool is_verified { get; set; }
     }
 
-
     ///////////////////////////////////
 
     public class InstaPostProgressArgs<T> where T : class
@@ -1386,6 +1405,8 @@ namespace SocialMediaDataScraper.Models
         public bool BreakLoop { get; set; }
         public int BreakLoopWait { get; set; }
     }
+
+    ///////////////////////////////////
 
     public class InstaBulkTaskParams<T> where T : class, new()
     {
@@ -1398,4 +1419,7 @@ namespace SocialMediaDataScraper.Models
         public int LoopBreakAttempts { get; set; } = 3;
         public int FailedAttempts { get; set; } = 3;
     }
+
+    ///////////////////////////////////
+
 }
