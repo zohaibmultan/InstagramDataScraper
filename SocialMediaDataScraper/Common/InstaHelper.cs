@@ -5,7 +5,6 @@ using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using System.Text;
 
 namespace SocialMediaDataScraper.Models
 {
@@ -21,19 +20,25 @@ namespace SocialMediaDataScraper.Models
             if (!Path.Exists(scriptPath)) return (false, $"{scriptFileName} not found");
 
             var scriptText = File.ReadAllText(scriptPath);
-            if (string.IsNullOrEmpty(scriptText)) return(false, $"{scriptFileName} is empty");
+            if (string.IsNullOrEmpty(scriptText)) return (false, $"{scriptFileName} is empty");
 
-            return (true,  scriptText);
+            return (true, scriptText);
         }
 
-        private static JObject FindJsonNodeFromScripts(string html, string keyword)
+        private static (JObject, List<string>) FindJsonNodeFromScripts(string html, string keyword)
         {
+            ArgumentNullException.ThrowIfNull(html, nameof(html));
+            ArgumentNullException.ThrowIfNull(keyword, nameof(keyword));
+
             var doc = new HtmlAgilityPack.HtmlDocument();
             doc.LoadHtml(html);
 
-            var scripts = doc.DocumentNode.SelectNodes("//script[@type='application/json']")?.Where(node => node.InnerText.Contains(keyword));
+            var scripts = doc.DocumentNode
+                .SelectNodes("//script[@type='application/json']")?
+                .Where(node => node.InnerText.Contains(keyword, StringComparison.OrdinalIgnoreCase))
+                .ToList();
 
-            if (scripts == null || !scripts.Any()) return null;
+            if (scripts == null || scripts.Count == 0) return (null, ["Keywords not found in script"]);
 
             foreach (var script in scripts)
             {
@@ -42,7 +47,7 @@ namespace SocialMediaDataScraper.Models
                     var json = JObject.Parse(script.InnerText);
                     var result = FindNodeByKey(json, keyword);
                     if (result != null)
-                        return result;
+                        return (result, null);
                 }
                 catch (Exception ex)
                 {
@@ -50,7 +55,7 @@ namespace SocialMediaDataScraper.Models
                 }
             }
 
-            return null;
+            return (null, ["Jons not found in script"]);
         }
 
         private static JObject FindNodeByKey(JToken token, string targetKey)
@@ -103,7 +108,55 @@ namespace SocialMediaDataScraper.Models
             });
         }
 
-  
+
+        private static async Task<(bool, string, List<string>)> GetWebResponseContent(CoreWebView2WebResourceResponseReceivedEventArgs e)
+        {
+            var errors = new List<string>();
+            if (e.Response == null)
+            {
+                errors.Add("Response is null");
+                return (false, null, errors);
+            }
+
+            using var stream = await e.Response.GetContentAsync();
+            if (stream == null)
+            {
+                errors.Add("Response stream is null");
+                return (false, null, errors);
+            }
+
+            using var reader = new StreamReader(stream);
+            if (reader == null)
+            {
+                errors.Add("Response stream reader is null");
+                return (false, null, errors);
+            }
+
+            var content = await reader.ReadToEndAsync();
+            if (string.IsNullOrWhiteSpace(content))
+            {
+                errors.Add("Response stream content is null");
+                return (false, null, errors);
+            }
+
+            return (true, content, errors);
+        }
+
+        private static async Task<(bool, JObject, List<string>)> GetWebResponseJsonObject(CoreWebView2WebResourceResponseReceivedEventArgs e)
+        {
+            var (status, content, errors) = await GetWebResponseContent(e);
+            if (!status) return (status, null, errors);
+
+            var root = JObject.Parse(content);
+            if (root == null)
+            {
+                errors.Add("Root object is null");
+                return (false, null, errors);
+            }
+
+            return (true, root, errors);
+        }
+
         private static async Task<WebViewJsExecuteResult> ExecuteJsAsync(WebView2 webView, string jsCode, int waitInSeconds = 15)
         {
             var tcs = new TaskCompletionSource<WebViewJsExecuteResult>();
@@ -169,13 +222,15 @@ namespace SocialMediaDataScraper.Models
         }
 
 
-        public static async Task<InstaResult<List<InstaReel>>> TestLogin(WebView2 webView, string username, int waitInSeconds = 60)
+        public static async Task<InstaResult<List<InstaReel>>> TestLogin(WebView2 webView, string username, TimeSpan? waitInSeconds = null)
         {
             var requestFilter = "graphql/query";
             var requestUrl = $"https://www.instagram.com/{username}";
             var responseFilterKey = "X-Root-Field-Name";
             var responseFilterValue = "xdt_api__v1__feed__reels_tray";
             var tcs = new TaskCompletionSource<InstaResult<List<InstaReel>>>();
+            var cts = new CancellationTokenSource(waitInSeconds ?? TimeSpan.FromSeconds(60));
+            var errors = new List<string>();
 
             bool IsValidRequest(CoreWebView2WebResourceRequest Request)
             {
@@ -188,34 +243,33 @@ namespace SocialMediaDataScraper.Models
             {
                 try
                 {
-                    if (!IsValidRequest(e.Request) || e.Response == null) return;
+                    if (!IsValidRequest(e.Request)) return;
 
-                    using var stream = await e.Response.GetContentAsync();
-                    if (stream == null) return;
+                    var (status, rootObject, errors) = await GetWebResponseJsonObject(e);
+                    if (!status)
+                    {
+                        tcs.TrySetResult(new InstaResult<List<InstaReel>> { Status = false, Errors = errors });
+                        return;
+                    }
 
-                    using var reader = new StreamReader(stream);
-                    if (reader == null) return;
+                    var feed = rootObject?["data"]?[responseFilterValue]?["tray"]?.ToObject<List<InstaReel>>();
+                    if (feed == null)
+                    {
+                        tcs.TrySetResult(new InstaResult<List<InstaReel>> { Status = false, Errors = ["Required node not found"] });
+                        return;
+                    }
 
-                    var content = await reader.ReadToEndAsync();
-                    if (string.IsNullOrWhiteSpace(content)) return;
-
-                    var root = JObject.Parse(content);
-                    if (root == null) return;
-
-                    var feed = root["data"]?[responseFilterValue]?["tray"] as JArray;
-                    if (feed == null) return;
-
-                    var reels = feed.ToObject<List<InstaReel>>();
                     isLogin = true;
 
                     tcs.SetResult(new InstaResult<List<InstaReel>>()
                     {
                         Status = true,
-                        Content = reels,
+                        Content = feed,
                     });
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
+                    errors = [.. errors, .. ex.GetAllInnerMessages()];
                     return;
                 }
             }
@@ -223,14 +277,13 @@ namespace SocialMediaDataScraper.Models
             try
             {
                 webView.CoreWebView2.WebResourceResponseReceived += WebView_WebResourceResponseReceived;
-                webView.Source = new Uri(requestUrl);
+                NavigateOrReload(webView, requestUrl);
 
-                var cts = new CancellationTokenSource(TimeSpan.FromSeconds(waitInSeconds));
                 cts.Token.Register(() => tcs.TrySetResult(new InstaResult<List<InstaReel>>()
                 {
                     Status = false,
                     Content = null,
-                    Errors = new List<string>() { "Request timed out" }
+                    Errors = [.. errors, "Request timed out"],
                 }));
 
                 return await tcs.Task;
@@ -241,12 +294,13 @@ namespace SocialMediaDataScraper.Models
                 {
                     Status = false,
                     Content = null,
-                    Errors = ex.GetAllInnerMessages(),
+                    Errors = [.. errors, .. ex.GetAllInnerMessages()],
                 };
             }
             finally
             {
                 webView.CoreWebView2.WebResourceResponseReceived -= WebView_WebResourceResponseReceived;
+                cts.Dispose();
             }
         }
 
@@ -261,6 +315,8 @@ namespace SocialMediaDataScraper.Models
         {
             var requestFilter = "graphql/query";
             var tcs = new TaskCompletionSource<InstaResult<InstaProfile>>();
+            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(waitInSeconds));
+            var errors = new List<string>();
 
             bool IsValidRequest(CoreWebView2WebResourceRequest Request)
             {
@@ -274,37 +330,26 @@ namespace SocialMediaDataScraper.Models
             {
                 try
                 {
-                    if (!IsValidRequest(e.Request) || e.Response == null) return;
+                    if (!IsValidRequest(e.Request)) return;
+                    var (status, rootObject, errors) = await GetWebResponseJsonObject(e);
+                    if (!status) return;
 
-                    using (var stream = await e.Response.GetContentAsync())
+                    var profile = rootObject["data"]?["user"]?.ToObject<InstaProfile>();
+                    if (profile == null || !profile.Validate())
                     {
-                        if (stream == null) return;
-                        using (StreamReader reader = new StreamReader(stream, Encoding.UTF8))
-                        {
-                            if (reader == null) return;
-                            var content = await reader.ReadToEndAsync();
-                            if (string.IsNullOrWhiteSpace(content)) return;
-
-                            var root = JObject.Parse(content);
-                            if (root == null) return;
-
-                            var user = (JObject)root["data"]?["user"];
-                            if (user == null) return;
-
-                            var profile = user.ToObject<InstaProfile>();
-                            if (profile == null) return;
-                            if (!profile.Validate()) return;
-
-                            tcs.SetResult(new InstaResult<InstaProfile>()
-                            {
-                                Status = true,
-                                Content = profile,
-                            });
-                        }
+                        errors.Add("Required node not found");
+                        return;
                     }
+
+                    tcs.SetResult(new InstaResult<InstaProfile>()
+                    {
+                        Status = true,
+                        Content = profile,
+                    });
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
+                    errors = [.. errors, .. ex.GetAllInnerMessages()];
                     return;
                 }
             }
@@ -312,21 +357,13 @@ namespace SocialMediaDataScraper.Models
             try
             {
                 webView.CoreWebView2.WebResourceResponseReceived += WebView_WebResourceResponseReceived;
-                if (webView.Source.ToString() == requestUrl)
-                {
-                    webView.CoreWebView2.Reload();
-                }
-                else
-                {
-                    webView.Source = new Uri(requestUrl);
-                }
+                NavigateOrReload(webView, requestUrl);
 
-                var cts = new CancellationTokenSource(TimeSpan.FromSeconds(waitInSeconds));
                 cts.Token.Register(() => tcs.TrySetResult(new InstaResult<InstaProfile>()
                 {
                     Status = false,
                     Content = null,
-                    Errors = new List<string>() { "Request timed out" }
+                    Errors = [.. errors, "Request timed out"]
                 }));
 
                 return await tcs.Task;
@@ -337,12 +374,13 @@ namespace SocialMediaDataScraper.Models
                 {
                     Status = false,
                     Content = null,
-                    Errors = ex.GetAllInnerMessages(),
+                    Errors = [.. errors, .. ex.GetAllInnerMessages()],
                 };
             }
             finally
             {
                 webView.CoreWebView2.WebResourceResponseReceived -= WebView_WebResourceResponseReceived;
+                cts.Dispose();
             }
         }
 
@@ -356,6 +394,8 @@ namespace SocialMediaDataScraper.Models
         public static async Task<InstaResult<InstaPostVr2>> GetPostByUrl(WebView2 webView, string requestUrl, int waitInSeconds = 60)
         {
             var tcs = new TaskCompletionSource<InstaResult<InstaPostVr2>>();
+            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(waitInSeconds));
+            var errors = new List<string>();
 
             bool IsValidRequest(CoreWebView2WebResourceRequest Request)
             {
@@ -363,112 +403,60 @@ namespace SocialMediaDataScraper.Models
                 return check1;
             }
 
-            JObject FindJsonNodeFromScripts(string html, string targetKey)
-            {
-                var doc = new HtmlAgilityPack.HtmlDocument();
-                doc.LoadHtml(html);
-
-                var scripts = doc.DocumentNode.SelectNodes("//script[@type='application/json']")?.Where(node => node.InnerText.Contains(targetKey));
-
-                if (scripts == null || !scripts.Any()) return null;
-
-                foreach (var script in scripts)
-                {
-                    try
-                    {
-                        var json = JObject.Parse(script.InnerText);
-                        var result = FindNodeByKey(json, targetKey);
-                        if (result != null)
-                            return result;
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine("JSON Parse Error: " + ex.Message);
-                    }
-                }
-
-                return null;
-            }
-
-            JObject FindNodeByKey(JToken token, string targetKey)
-            {
-                if (token.Type == JTokenType.Object)
-                {
-                    var obj = (JObject)token;
-                    foreach (var prop in obj.Properties())
-                    {
-                        if (prop.Name == targetKey)
-                            return prop.Value as JObject;
-
-                        var found = FindNodeByKey(prop.Value, targetKey);
-                        if (found != null)
-                            return found;
-                    }
-                }
-                else if (token.Type == JTokenType.Array)
-                {
-                    foreach (var item in (JArray)token)
-                    {
-                        var found = FindNodeByKey(item, targetKey);
-                        if (found != null)
-                            return found;
-                    }
-                }
-
-                return null;
-            }
-
             async void WebView_WebResourceResponseReceived(object sender, CoreWebView2WebResourceResponseReceivedEventArgs e)
             {
+                if (e?.Request is null || !IsValidRequest(e.Request)) return;
+
                 try
                 {
-                    if (!IsValidRequest(e.Request) || e.Response == null) return;
-
-                    using (var stream = await e.Response.GetContentAsync())
+                    var (status, content, errors) = await GetWebResponseContent(e);
+                    if (!status || string.IsNullOrEmpty(content))
                     {
-                        if (stream == null) return;
-                        using (StreamReader reader = new StreamReader(stream, Encoding.UTF8))
-                        {
-                            if (reader == null) return;
-                            var content = await reader.ReadToEndAsync();
-                            if (string.IsNullOrWhiteSpace(content)) return;
-
-                            var obj = FindJsonNodeFromScripts(content, "xdt_api__v1__media__shortcode__web_info");
-                            var edges = (JArray)obj["items"];
-                            var node = edges[0].ToObject<InstaPostVr2>();
-
-                            tcs.SetResult(new InstaResult<InstaPostVr2>()
-                            {
-                                Status = true,
-                                Content = node,
-                            });
-                        }
+                        tcs.TrySetResult(new InstaResult<InstaPostVr2> { Status = false, Errors = errors });
+                        return;
                     }
+
+                    var (obj, parseErrors) = FindJsonNodeFromScripts(content, "xdt_api__v1__media__shortcode__web_info");
+                    if (obj is null)
+                    {
+                        tcs.TrySetResult(new InstaResult<InstaPostVr2> { Status = false, Errors = parseErrors });
+                        return;
+                    }
+
+                    var edges = obj["items"] as JArray;
+                    if (edges is null || !edges.Any())
+                    {
+                        tcs.TrySetResult(new InstaResult<InstaPostVr2> { Status = false, Errors = ["No items found in JSON response"] });
+                        return;
+                    }
+
+                    var node = edges[0].ToObject<InstaPostVr2>();
+                    tcs.TrySetResult(new InstaResult<InstaPostVr2>
+                    {
+                        Status = true,
+                        Content = node
+                    });
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
-                    return;
+                    tcs.TrySetResult(new InstaResult<InstaPostVr2>
+                    {
+                        Status = false,
+                        Errors = ex.GetAllInnerMessages(),
+                    });
                 }
             }
 
             try
             {
                 webView.CoreWebView2.WebResourceResponseReceived += WebView_WebResourceResponseReceived;
-                if (webView.Source.ToString() == requestUrl)
-                {
-                    webView.CoreWebView2.Reload();
-                }
-                else
-                {
-                    webView.Source = new Uri(requestUrl);
-                }
+                NavigateOrReload(webView, requestUrl);
 
-                var cts = new CancellationTokenSource(TimeSpan.FromSeconds(waitInSeconds));
                 cts.Token.Register(() => tcs.TrySetResult(new InstaResult<InstaPostVr2>()
                 {
                     Status = false,
                     Content = null,
-                    Errors = new List<string>() { "Request timed out" }
+                    Errors = [.. errors, "Request timed out"]
                 }));
 
                 return await tcs.Task;
@@ -485,23 +473,27 @@ namespace SocialMediaDataScraper.Models
             finally
             {
                 webView.CoreWebView2.WebResourceResponseReceived -= WebView_WebResourceResponseReceived;
+                cts.Dispose();
             }
         }
 
 
-        public static async Task<InstaResult<List<InstaPost>>> GetPostsByUsername(WebView2 webView, string username, CancellationTokenSource cancellationToken, int postCount = 0, int minWait = 5, int maxWait = 15, EventHandler<InstaPostProgressArgs<InstaPost>> taskProgress = null, int loopBreakAttemps = 3)
+        public static async Task<InstaResult<List<InstaPost>>> GetPostsByUsername(string username, InstaBulkTaskParams<InstaPost> taskParams)
         {
             var requestUrl = $"https://www.instagram.com/{username}";
-            return await GetPostsByUrl(webView, requestUrl, cancellationToken, postCount, minWait, maxWait, taskProgress, loopBreakAttemps);
+            return await GetPostsByUrl(requestUrl, taskParams);
         }
 
-        public static async Task<InstaResult<List<InstaPost>>> GetPostsByUrl(WebView2 webView, string requestUrl, CancellationTokenSource cancellationToken, int postCount = 0, int minWait = 5, int maxWait = 15, EventHandler<InstaPostProgressArgs<InstaPost>> taskProgress = null, int loopBreakAttemps = 3)
+        public static async Task<InstaResult<List<InstaPost>>> GetPostsByUrl(string requestUrl, InstaBulkTaskParams<InstaPost> taskParams)
         {
             var requestFilter = "graphql/query";
-            var allPosts = new List<InstaPost>();
-            var random = new Random();
-            var attempts = loopBreakAttemps;
+            var collection = new List<InstaPost>();
             var requests = new Dictionary<string, bool>();
+            var errors = new List<string>();
+            var random = new Random();
+            var successAttempts = 0;
+            var failedAttempts = 0;
+            var hasNextPage = true;
 
             bool IsValidRequest(CoreWebView2WebResourceRequest Request)
             {
@@ -510,9 +502,8 @@ namespace SocialMediaDataScraper.Models
                 return check1 && check2;
             }
 
-            async void OnWebResourceRequested(object sender, CoreWebView2WebResourceRequestedEventArgs e)
+            void OnWebResourceRequested(object sender, CoreWebView2WebResourceRequestedEventArgs e)
             {
-                await Task.Delay(0);
                 if (IsValidRequest(e.Request))
                 {
                     var requestId = Guid.NewGuid().ToString();
@@ -525,133 +516,126 @@ namespace SocialMediaDataScraper.Models
             {
                 try
                 {
-                    if (!IsValidRequest(e.Request)) return;
+                    if (e?.Request is null || !IsValidRequest(e.Request)) return;
 
                     var headerReqId = e.Request.Headers.FirstOrDefault(x => x.Key.Equals("X-Request-Id", StringComparison.CurrentCultureIgnoreCase));
+                    if (headerReqId.Value is null)
+                    {
+                        failedAttempts++;
+                        errors.Add("Request validated but not registered");
+                        return;
+                    }
+
                     requests[headerReqId.Value] = true;
 
-                    attempts--;
-
-                    using (var stream = await e.Response.GetContentAsync())
+                    var (status, rootObject, parseErrors) = await GetWebResponseJsonObject(e);
+                    if (!status)
                     {
-                        if (stream == null) return;
-                        using (StreamReader reader = new StreamReader(stream, Encoding.UTF8))
-                        {
-                            if (reader == null) return;
-                            var content = await reader.ReadToEndAsync();
-                            if (string.IsNullOrWhiteSpace(content)) return;
+                        failedAttempts++;
+                        errors.AddRange(parseErrors);
+                        return;
+                    }
 
-                            var root = JObject.Parse(content);
-                            var edges = (JArray)root["data"]?["xdt_api__v1__feed__user_timeline_graphql_connection"]?["edges"];
-                            foreach (var edge in edges)
-                            {
-                                var node = (JObject)edge["node"];
-                                if (node == null) continue;
+                    var edges = rootObject?["data"]?["xdt_api__v1__feed__user_timeline_graphql_connection"]?["edges"] as JArray;
+                    if (edges is null || !edges.Any())
+                    {
+                        failedAttempts++;
+                        errors.Add("Required node edges not found");
+                        return;
+                    }
 
-                                var post = node.ToObject<InstaPost>();
-                                if (post == null) continue;
+                    var list = edges.Select(edge => edge["node"]?.ToObject<InstaPost>())
+                        .Where(post => post is not null)
+                        .ToList();
 
-                                allPosts.Add(post);
-                            }
-
-                            taskProgress?.Invoke(webView, new InstaPostProgressArgs<InstaPost>()
-                            {
-                                Message = $"{allPosts.Count} posts collected, attempts remaining {attempts}",
-                            });
-                        }
+                    if (list.Count > 0)
+                    {
+                        successAttempts++;
+                        failedAttempts = 0;
+                        errors.Clear();
+                        collection.AddRange(list);
+                        SendTaskProgress(taskParams, $"{list.Count}/{collection.Count}/{taskParams.RecordsCount} records collected, attempt {successAttempts}");
+                    }
+                    else
+                    {
+                        failedAttempts++;
+                        errors.Add("Required node edges not found");
                     }
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
-
+                    failedAttempts++;
+                    errors = [.. errors, .. ex.GetAllInnerMessages()];
                 }
             }
 
             try
             {
-                webView.CoreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
-                webView.CoreWebView2.WebResourceRequested += OnWebResourceRequested;
-                webView.CoreWebView2.WebResourceResponseReceived += OnWebResourceResponseReceived;
+                taskParams.WebView.CoreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
+                taskParams.WebView.CoreWebView2.WebResourceRequested += OnWebResourceRequested;
+                taskParams.WebView.CoreWebView2.WebResourceResponseReceived += OnWebResourceResponseReceived;
 
-                if (webView.Source.ToString() == requestUrl)
-                {
-                    webView.CoreWebView2.Reload();
-                }
-                else
-                {
-                    webView.Source = new Uri(requestUrl);
-                }
+                NavigateOrReload(taskParams.WebView, requestUrl);
 
-                while (!cancellationToken.IsCancellationRequested && allPosts.Count < postCount)
+                while (!taskParams.CancellationToken.IsCancellationRequested)
                 {
-                    if (requests.Values.Any(x => !x))
+                    WebViewHelper.ScrollDown(taskParams.WebView);
+
+                    if (!hasNextPage) break;
+                    if (taskParams.RecordsCount != 0 && collection.Count >= taskParams.RecordsCount) break;
+                    if (failedAttempts == taskParams.FailedAttempts) break;
+                    if (successAttempts > 0 && successAttempts % taskParams.LoopBreakAttempts == 0)
                     {
-                        await Task.Delay(1000, cancellationToken.Token);
+                        var wait = random.Next(15, 60);
+                        SendTaskProgress(taskParams, $"Break loop wait for {wait} seconds...", true, wait);
+                        await Task.Delay(TimeSpan.FromSeconds(wait), taskParams.CancellationToken.Token);
                         continue;
                     }
 
-                    if (attempts == 0)
-                    {
-                        var wait = random.Next(15, 30);
-                        attempts = loopBreakAttemps;
-
-                        taskProgress?.Invoke(webView, new InstaPostProgressArgs<InstaPost>()
-                        {
-                            Message = $"Break loop wait for {wait} seconds...",
-                            BreakLoop = true,
-                            BreakLoopWait = random.Next(60, 180)
-                        });
-                        await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken.Token);
-
-                        continue;
-                    }
-
-                    WebViewHelper.ScrollDown(webView);
-
-                    var timeWait = random.Next(minWait, maxWait);
-                    taskProgress?.Invoke(webView, new InstaPostProgressArgs<InstaPost>()
-                    {
-                        Message = $"Wait for {timeWait} seconds...",
-                    });
-
-                    await Task.Delay(TimeSpan.FromSeconds(timeWait), cancellationToken.Token);
+                    var timeWait = random.Next(taskParams.MinWait, taskParams.MaxWait);
+                    SendTaskProgress(taskParams, $"Wait for {timeWait} seconds...");
+                    await Task.Delay(TimeSpan.FromSeconds(timeWait), taskParams.CancellationToken.Token);
                 }
 
                 return new InstaResult<List<InstaPost>>()
                 {
                     Status = true,
-                    Content = allPosts,
+                    Content = collection,
                 };
             }
             catch (Exception ex)
             {
                 return new InstaResult<List<InstaPost>>()
                 {
-                    Status = allPosts.Count > 0,
-                    Content = allPosts,
+                    Status = collection.Count > 0,
+                    Content = collection,
                     Errors = ex.GetAllInnerMessages()
                 };
             }
             finally
             {
-                webView.CoreWebView2.WebResourceRequested -= OnWebResourceRequested;
-                webView.CoreWebView2.WebResourceResponseReceived -= OnWebResourceResponseReceived;
+                taskParams.WebView.CoreWebView2.WebResourceRequested -= OnWebResourceRequested;
+                taskParams.WebView.CoreWebView2.WebResourceResponseReceived -= OnWebResourceResponseReceived;
             }
         }
 
 
-        public static async Task<InstaResult<List<InstaFollowing>>> GetFollowingsByUsername(WebView2 webView, string username, CancellationTokenSource cancellationToken, int followingCount = 0, int minWait = 5, int maxWait = 15, EventHandler<InstaPostProgressArgs<InstaFollowing>> taskProgress = null, int loopBreakAttemps = 3)
+        public static async Task<InstaResult<List<InstaFollowing>>> GetFollowingsByUsername(string username, InstaBulkTaskParams<InstaFollowing> taskParams)
         {
             var requestUrl = $"https://www.instagram.com/{username}/following/";
             return await GetFollowingsByUrl(webView, requestUrl, cancellationToken, followingCount, minWait, maxWait, taskProgress, loopBreakAttemps);
         }
 
-        public static async Task<InstaResult<List<InstaFollowing>>> GetFollowingsByUrl(WebView2 webView, string requestUrl, CancellationTokenSource cancellationToken, int followingCount = 0, int minWait = 5, int maxWait = 15, EventHandler<InstaPostProgressArgs<InstaFollowing>> taskProgress = null, int loopBreakAttemps = 3)
+        public static async Task<InstaResult<List<InstaFollowing>>> GetFollowingsByUrl(string requestUrl, InstaBulkTaskParams<InstaFollowing> taskParams)
         {
             var requestFilter = "api/v1/friendships";
-            var attempts = loopBreakAttemps;
             var requests = new Dictionary<string, bool>();
-            var followings = new List<InstaFollowing>();
+            var collection = new List<InstaFollowing>();
+            var errors = new List<string>();
+            var random = new Random();
+            var successAttempts = 0;
+            var failedAttempts = 0;
+            var hasNextPage = true;
 
             bool IsValidRequest(CoreWebView2WebResourceRequest Request)
             {
@@ -659,9 +643,8 @@ namespace SocialMediaDataScraper.Models
                 return check1;
             }
 
-            async void OnWebResourceRequested(object sender, CoreWebView2WebResourceRequestedEventArgs e)
+            void OnWebResourceRequested(object sender, CoreWebView2WebResourceRequestedEventArgs e)
             {
-                await Task.Delay(0);
                 if (IsValidRequest(e.Request))
                 {
                     var requestId = Guid.NewGuid().ToString();
@@ -674,116 +657,106 @@ namespace SocialMediaDataScraper.Models
             {
                 try
                 {
-                    if (!IsValidRequest(e.Request)) return;
+                    if (e?.Response is null || !IsValidRequest(e.Request)) return;
 
                     var headerReqId = e.Request.Headers.FirstOrDefault(x => x.Key.Equals("X-Request-Id", StringComparison.CurrentCultureIgnoreCase));
-                    requests[headerReqId.Value] = true;
-
-                    attempts--;
-
-                    using var stream = await e.Response.GetContentAsync();
-                    if (stream == null) return;
-
-                    using var reader = new StreamReader(stream);
-                    if (reader == null) return;
-
-                    var content = await reader.ReadToEndAsync();
-                    if (string.IsNullOrWhiteSpace(content)) return;
-
-                    var root = JObject.Parse(content);
-                    var users = (JArray)root["users"];
-                    if (users == null) return;
-
-                    foreach (var user in users)
+                    if (headerReqId.Value is null)
                     {
-                        var node = (JObject)user;
-                        if (node == null) continue;
-
-                        var post = node.ToObject<InstaFollowing>();
-                        if (post == null) continue;
-
-                        followings.Add(post);
+                        failedAttempts++;
+                        errors.Add("Request validated but not registered");
+                        return;
                     }
 
-                    taskProgress?.Invoke(webView, new InstaPostProgressArgs<InstaFollowing>()
-                    {
-                        Message = $"{followings.Count} records collected, attempts remaining {attempts}",
-                    });
-                }
-                catch (Exception)
-                {
+                    requests[headerReqId.Value] = true;
 
+                    var (status, rootObject, parseErrors) = await GetWebResponseJsonObject(e);
+                    if (!status)
+                    {
+                        failedAttempts++;
+                        errors.AddRange(parseErrors);
+                        return;
+                    }
+
+                    var edges = rootObject["users"] as JArray;
+                    if (edges is null || !edges.Any())
+                    {
+                        failedAttempts++;
+                        errors.Add("Required node edges not found");
+                        return;
+                    }
+
+                    var list = edges.Select(edge => edge["node"]?.ToObject<InstaFollowing>())
+                        .Where(post => post is not null)
+                        .ToList();
+
+                    if (list.Count > 0)
+                    {
+                        successAttempts++;
+                        failedAttempts = 0;
+                        errors.Clear();
+                        collection.AddRange(list);
+                        SendTaskProgress(taskParams, $"{list.Count}/{collection.Count}/{taskParams.RecordsCount} records collected, attempt {successAttempts}");
+                    }
+                    else
+                    {
+                        failedAttempts++;
+                        errors.Add("Required node edges not found");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    failedAttempts++;
+                    errors = [.. errors, .. ex.GetAllInnerMessages()];
                 }
             }
 
             try
             {
-                webView.CoreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
-                webView.CoreWebView2.WebResourceRequested += OnWebResourceRequested;
-                webView.CoreWebView2.WebResourceResponseReceived += OnWebResourceResponseReceived;
+                taskParams.WebView.CoreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
+                taskParams.WebView.CoreWebView2.WebResourceRequested += OnWebResourceRequested;
+                taskParams.WebView.CoreWebView2.WebResourceResponseReceived += OnWebResourceResponseReceived;
 
-                if (webView.Source.ToString() == requestUrl)
-                    webView.CoreWebView2.Reload();
-                else
-                    webView.Source = new Uri(requestUrl);
+                NavigateOrReload(taskParams.WebView, requestUrl);
 
-
-                while (!cancellationToken.IsCancellationRequested && followings.Count < followingCount)
+                while (!taskParams.CancellationToken.IsCancellationRequested)
                 {
-                    if (requests.Values.Any(x => !x))
+                    WebViewHelper.ScrollDown(taskParams.WebView);
+
+                    if (!hasNextPage) break;
+                    if (taskParams.RecordsCount != 0 && collection.Count >= taskParams.RecordsCount) break;
+                    if (failedAttempts == taskParams.FailedAttempts) break;
+                    if (successAttempts > 0 && successAttempts % taskParams.LoopBreakAttempts == 0)
                     {
-                        await Task.Delay(1000, cancellationToken.Token);
+                        var wait = random.Next(15, 60);
+                        SendTaskProgress(taskParams, $"Break loop wait for {wait} seconds...", true, wait);
+                        await Task.Delay(TimeSpan.FromSeconds(wait), taskParams.CancellationToken.Token);
                         continue;
                     }
 
-                    if (attempts == 0)
-                    {
-                        var wait = random.Next(15, 30);
-                        attempts = loopBreakAttemps;
-
-                        taskProgress?.Invoke(webView, new InstaPostProgressArgs<InstaFollowing>()
-                        {
-                            Message = $"Break loop wait for {wait} seconds...",
-                            BreakLoop = true,
-                            BreakLoopWait = random.Next(60, 180)
-                        });
-                        await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken.Token);
-
-                        continue;
-                    }
-
-                    WebViewHelper.ScrollDown(webView);
-
-                    var timeWait = random.Next(minWait, maxWait);
-                    taskProgress?.Invoke(webView, new InstaPostProgressArgs<InstaFollowing>()
-                    {
-                        Message = $"Wait for {timeWait} seconds...",
-                    });
-
-                    if (followings.Count >= followingCount) break;
-
-                    await Task.Delay(TimeSpan.FromSeconds(timeWait), cancellationToken.Token);
+                    var timeWait = random.Next(taskParams.MinWait, taskParams.MaxWait);
+                    SendTaskProgress(taskParams, $"Wait for {timeWait} seconds...");
+                    await Task.Delay(TimeSpan.FromSeconds(timeWait), taskParams.CancellationToken.Token);
                 }
 
                 return new InstaResult<List<InstaFollowing>>()
                 {
                     Status = true,
-                    Content = followings,
+                    Content = collection,
                 };
             }
             catch (Exception ex)
             {
                 return new InstaResult<List<InstaFollowing>>()
                 {
-                    Status = followings.Count > 0,
-                    Content = followings,
+                    Status = collection.Count > 0,
+                    Content = collection,
                     Errors = ex.GetAllInnerMessages()
                 };
             }
             finally
             {
-                webView.CoreWebView2.WebResourceRequested -= OnWebResourceRequested;
-                webView.CoreWebView2.WebResourceResponseReceived -= OnWebResourceResponseReceived;
+                taskParams.WebView.CoreWebView2.WebResourceRequested -= OnWebResourceRequested;
+                taskParams.WebView.CoreWebView2.WebResourceResponseReceived -= OnWebResourceResponseReceived;
             }
         }
 
@@ -876,7 +849,7 @@ namespace SocialMediaDataScraper.Models
             try
             {
                 var (status, scriptText) = GetScriptFromFile(scriptName);
-                if(!status)
+                if (!status)
                 {
                     return new InstaResult<List<InstaFollowing>>()
                     {
@@ -934,6 +907,7 @@ namespace SocialMediaDataScraper.Models
             var responseFilterValue = "xdt_api__v1__media__media_id__comments__connection";
             var collection = new List<InstaComment>();
             var requests = new Dictionary<string, bool>();
+            var errors = new List<string>();
             var successAttempts = 0;
             var failedAttempts = 0;
             var hasNextPage = true;
@@ -946,9 +920,8 @@ namespace SocialMediaDataScraper.Models
                 return (check1 && check2) || check3;
             }
 
-            async void OnWebResourceRequested(object sender, CoreWebView2WebResourceRequestedEventArgs e)
+            void OnWebResourceRequested(object sender, CoreWebView2WebResourceRequestedEventArgs e)
             {
-                await Task.Delay(0);
                 if (IsValidRequest(e.Request))
                 {
                     var requestId = Guid.NewGuid().ToString();
@@ -964,56 +937,65 @@ namespace SocialMediaDataScraper.Models
                     if (!IsValidRequest(e.Request) || e.Response == null) return;
 
                     var headerReqId = e.Request.Headers.FirstOrDefault(x => x.Key.Equals("X-Request-Id", StringComparison.CurrentCultureIgnoreCase));
+                    if (headerReqId.Value is null)
+                    {
+                        failedAttempts++;
+                        errors.Add("Request validated but not registered");
+                        return;
+                    }
+
                     requests[headerReqId.Value] = true;
 
-                    using var stream = await e.Response.GetContentAsync();
-                    if (stream == null) return;
-
-                    using var reader = new StreamReader(stream);
-                    if (reader == null) return;
-
-                    var content = await reader.ReadToEndAsync();
-                    if (string.IsNullOrWhiteSpace(content)) return;
+                    var (status, content, parseErrors) = await GetWebResponseContent(e);
+                    if (!status)
+                    {
+                        failedAttempts++;
+                        errors.AddRange(parseErrors);
+                        return;
+                    }
 
                     if (e.Request.Uri == requestUrl)
                     {
-                        var obj = FindJsonNodeFromScripts(content, responseFilterValue);
-                        if (obj == null)
+                        var (obj, scriptParseErrors) = FindJsonNodeFromScripts(content, "xdt_api__v1__media__shortcode__web_info");
+                        if (obj is null)
                         {
                             SendTaskProgress(taskParams, $"Unable to find script, failed {++failedAttempts}");
                             return;
                         }
 
                         hasNextPage = obj["page_info"]?["has_next_page"].Value<bool>() ?? false;
-                        var edges = (JArray)obj["edges"];
-                        if (edges == null)
+                        var edges = obj["edges"] as JArray;
+                        if (edges is null || !edges.Any())
                         {
                             SendTaskProgress(taskParams, $"Unable to get edges, failed {++failedAttempts}");
                             return;
                         }
 
-                        var list = new List<InstaComment>();
-                        foreach (var edge in edges)
+                        var list = edges.Select(edge => edge["node"]?.ToObject<InstaComment>())
+                            .Where(post => post is not null)
+                            .ToList();
+
+                        if (list.Count > 0)
                         {
-                            var node = (JObject)edge["node"];
-                            if (node == null) continue;
-
-                            var comment = node.ToObject<InstaComment>();
-                            if (comment == null) continue;
-
-                            list.Add(comment);
+                            successAttempts++;
+                            failedAttempts = 0;
+                            errors.Clear();
+                            collection.AddRange(list);
+                            SendTaskProgress(taskParams, $"{list.Count}/{collection.Count}/{taskParams.RecordsCount} records collected, attempt {successAttempts}");
                         }
-
-                        successAttempts++;
-                        collection.AddRange(list);
-                        SendTaskProgress(taskParams, $"{list.Count}/{collection.Count}/{taskParams.RecordsCount} records collected, attempt {successAttempts}");
+                        else
+                        {
+                            failedAttempts++;
+                            errors.Add("Required node edges not found");
+                        }
                     }
                     else
                     {
                         var root = JObject.Parse(content);
-                        if (root == null)
+                        if (root is null)
                         {
-                            SendTaskProgress(taskParams, $"Unable to get root object, failed {++failedAttempts}");
+                            failedAttempts++;
+                            SendTaskProgress(taskParams, $"Unable to get root object, failed {failedAttempts}");
                             return;
                         }
 
@@ -1021,30 +1003,34 @@ namespace SocialMediaDataScraper.Models
                         var edges = (JArray)root["data"]?[responseFilterValue]?["edges"];
                         if (edges == null)
                         {
-                            SendTaskProgress(taskParams, $"Unable to get edges, failed {++failedAttempts}");
+                            failedAttempts++;
+                            SendTaskProgress(taskParams, $"Unable to get edges, failed {failedAttempts}");
                             return;
                         }
 
-                        var list = new List<InstaComment>();
-                        foreach (var edge in edges)
+                        var list = edges.Select(edge => edge["node"]?.ToObject<InstaComment>())
+                            .Where(post => post is not null)
+                            .ToList();
+
+                        if (list.Count > 0)
                         {
-                            var node = (JObject)edge["node"];
-                            if (node == null) continue;
-
-                            var comment = node.ToObject<InstaComment>();
-                            if (comment == null) continue;
-
-                            list.Add(comment);
+                            successAttempts++;
+                            failedAttempts = 0;
+                            errors.Clear();
+                            collection.AddRange(list);
+                            SendTaskProgress(taskParams, $"{list.Count}/{collection.Count}/{taskParams.RecordsCount} records collected, attempt {successAttempts}");
                         }
-
-                        successAttempts++;
-                        collection.AddRange(list);
-                        SendTaskProgress(taskParams, $"{list.Count}/{collection.Count}/{taskParams.RecordsCount} records collected, attempt {successAttempts}");
+                        else
+                        {
+                            failedAttempts++;
+                            errors.Add("Required node edges not found");
+                        }
                     }
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
                     failedAttempts++;
+                    errors = [.. errors, .. ex.GetAllInnerMessages()];
                 }
             }
 
