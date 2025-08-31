@@ -76,6 +76,20 @@ namespace SocialMediaDataScraper.Models
         public string ProfileUrl { get; set; }
     }
 
+    public class QueryFollowing : QueryBulk
+    {
+        [DisplayName("Username")]
+        [Description("Instagram username (example insta_bloger)")]
+        [RequireAtLeastOne(nameof(ProfileUrl), ErrorMessage = "At least username or profile url must be provided.")]
+        public string Username { get; set; }
+
+        [DisplayName("Profile Url")]
+        [Description("Instagram profile URL")]
+        [RequireAtLeastOne(nameof(Username), ErrorMessage = "At least username or profile url must be provided.")]
+        [Url(ErrorMessage = "Invalid URL")]
+        public string ProfileUrl { get; set; }
+    }
+
     public class QueryFollowingAjax : QueryBulk
     {
         [DisplayName("User PK")]
@@ -88,6 +102,14 @@ namespace SocialMediaDataScraper.Models
         public string Username { get; set; }
     }
 
+    public class QueryPostComments : QueryBulk
+    {
+        [DisplayName("Post Shortcode")]
+        [Description("Instagram post shortcode (example Cx34gb7l43)")]
+        [Required(ErrorMessage = "Post shortcode is required")]
+        public string PostShortCode { get; set; }
+    }
+
     public static class QueryAction
     {
         public const string NoAction = "";
@@ -97,6 +119,7 @@ namespace SocialMediaDataScraper.Models
         public const string GetPostsByUser = "Get All Posts of User";
         public const string GetPostComments = "Get Comments of Post";
         public const string GetFollowings = "Get Followings of User";
+        public const string GetFollowingsAjax = "Get Followings of User (Ajax)";
 
 
         public static List<string> GetAllQueryActions()

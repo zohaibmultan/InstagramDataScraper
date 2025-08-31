@@ -126,7 +126,7 @@ namespace SocialMediaDataScraper.Models
             }
         }
 
-        public static async void ScrollDownAllDivOnPage(WebView2 webView, long wait)
+        public static async void ScrollDownAllDivOnPage(WebView2 webView, TimeSpan? wait = null)
         {
             if (webView.CoreWebView2 == null)
             {
@@ -138,7 +138,7 @@ namespace SocialMediaDataScraper.Models
                 var filePath = Path.Combine(ScriptDirectory, "ScrollDownAllDivOnPage.js");
                 var script = System.IO.File.ReadAllText(filePath);
                 await webView.CoreWebView2.ExecuteScriptAsync(script);
-                await webView.CoreWebView2.ExecuteScriptAsync($"scrollDownAllDivOnPage({wait})");
+                await webView.CoreWebView2.ExecuteScriptAsync($"scrollDownAllDivOnPage({wait?.TotalSeconds ?? 2})");
                 return;
             }
             catch (Exception)

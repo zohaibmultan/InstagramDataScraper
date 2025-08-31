@@ -257,28 +257,18 @@ namespace SocialMediaDataScraper
 
         private async Task GetFollowings()
         {
-            var query = new QueryBulkPosts();
-            InstaResult<List<InstaFollowing>> data = null;
             var cancellationToken = new CancellationTokenSource();
-
-            void TaskCancel(object sender, EventArgs e)
-            {
-                var ans = MessageBox.Show("Do you want to cancel the task?", "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                if (ans != DialogResult.Yes) return;
-                cancellationToken.Cancel();
-            }
-
-            if (new PropertyForm("Task Details", query).ShowDialog() != DialogResult.OK) return;
-
-            if (webView == null || webView.CoreWebView2 == null) return;
+            EventHandler canellationEvent = (sender, e) => CancelRunningTask(cancellationToken);
+            var (res, query) = ShowQueryDialog<QueryFollowing>();
+            if (res != DialogResult.OK) return;
 
             Log(DS_BrowserLogType.Info, $"-------- GET FOLLOWINGS --------");
-            btn_stopCommand.Click += TaskCancel;
+            btn_stopCommand.Click += canellationEvent;
 
             if (!string.IsNullOrEmpty(query.Username))
             {
                 Log(DS_BrowserLogType.Info, $"Getting followings {query.Username}...");
-                data = await InstaHelper.GetFollowingsByUsername(
+                var data = await InstaHelper.GetFollowingsByUsername(
                     webView,
                     query.Username,
                     cancellationToken,
@@ -292,11 +282,12 @@ namespace SocialMediaDataScraper
                     },
                     query.LoopBreak
                 );
+                SaveData<List<InstaFollowing>, InstaFollowing>(data);
             }
             else if (!string.IsNullOrEmpty(query.ProfileUrl))
             {
                 Log(DS_BrowserLogType.Info, $"Getting followings {query.ProfileUrl}...");
-                data = data = await InstaHelper.GetFollowingsByUsername(
+                var data = await InstaHelper.GetFollowingsByUrl(
                     webView,
                     query.ProfileUrl,
                     cancellationToken,
@@ -310,26 +301,10 @@ namespace SocialMediaDataScraper
                     },
                     query.LoopBreak
                 );
+                SaveData<List<InstaFollowing>, InstaFollowing>(data);
             }
 
-            if (data != null && data.Status)
-            {
-                var jsonData = JsonConvert.SerializeObject(data.Content, Formatting.Indented);
-                Log(DS_BrowserLogType.Info, $"Following data collected, Double click to view", content: jsonData);
-
-                var ans = DbHelper.SaveMany<InstaFollowing>(data.Content);
-                Log(ans ? DS_BrowserLogType.Info : DS_BrowserLogType.Error, ans ? "Following data saved" : "Unable to save following data");
-            }
-            else if (data != null && !data.Status)
-            {
-                data.Errors.ForEach(error => Log(DS_BrowserLogType.Error, error));
-            }
-            else
-            {
-                Log(DS_BrowserLogType.Error, "Collected data is null");
-            }
-
-            btn_stopCommand.Click -= TaskCancel;
+            btn_stopCommand.Click -= canellationEvent;
             Log(DS_BrowserLogType.Info, $"-------- GET FOLLOWINGS END --------");
         }
 
@@ -367,6 +342,41 @@ namespace SocialMediaDataScraper
 
             btn_stopCommand.Click -= canellationEvent;
             Log(DS_BrowserLogType.Info, $"-------- GET FOLLOWINGS END --------");
+        }
+
+        private async Task GetPostComments()
+        {
+            var cancellationToken = new CancellationTokenSource();
+            EventHandler canellationEvent = (sender, e) => CancelRunningTask(cancellationToken);
+            var (res, query) = ShowQueryDialog<QueryPostComments>();
+            if (res != DialogResult.OK) return;
+
+            Log(DS_BrowserLogType.Info, $"-------- GET POST COMMENTS --------");
+            btn_stopCommand.Click += canellationEvent;
+
+            Log(DS_BrowserLogType.Info, $"Getting post comments {query.PostShortCode}...");
+            var data = await InstaHelper.GetPostComments(
+                query.PostShortCode,
+                new InstaBulkTaskParams<InstaComment>()
+                {
+                    WebView = webView,
+                    CancellationToken = cancellationToken,
+                    RecordsCount = query.RecordsCount,
+                    MinWait = query.MinWait,
+                    MaxWait = query.MaxWait,
+                    TaskProgress = (s, e) =>
+                    {
+                        Log(DS_BrowserLogType.Info, e.Message);
+                        if (e.BreakLoop) BreakLoop(e.BreakLoopWait);
+                    },
+                    LoopBreakAttempts = query.LoopBreak,
+                    FailedAttempts = 3,
+                }
+            );
+            SaveData<List<InstaComment>, InstaComment>(data);
+
+            btn_stopCommand.Click -= canellationEvent;
+            Log(DS_BrowserLogType.Info, $"-------- GET POST COMMENTS END --------");
         }
 
         private void BreakLoop(int time)
@@ -479,10 +489,15 @@ namespace SocialMediaDataScraper
                         break;
 
                     case QueryAction.GetFollowings:
+                        await GetFollowings();
+                        break;
+
+                    case QueryAction.GetFollowingsAjax:
                         await GetFollowingsAjax();
                         break;
 
                     case QueryAction.GetPostComments:
+                        await GetPostComments();
                         break;
                 }
             }
@@ -495,6 +510,7 @@ namespace SocialMediaDataScraper
                 UpdateUI(true);
             }
         }
+
 
         private void UC_Controller_Load(object sender, EventArgs e)
         {
