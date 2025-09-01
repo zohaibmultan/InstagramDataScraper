@@ -5,16 +5,16 @@ using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System;
 
 namespace SocialMediaDataScraper.Models
 {
-    public static class InstaHelper
+    public class InstaHelper
     {
-        private static Random random = new Random();
-        private static bool isLogin = false;
+        private readonly Random random = new();
+        private bool isLogin = false;
 
-
-        private static (bool, string) GetScriptFromFile(string scriptFileName)
+        private (bool, string) GetScriptFromFile(string scriptFileName)
         {
             var scriptPath = Path.Combine(WebViewHelper.ScriptDirectory, scriptFileName);
             if (!Path.Exists(scriptPath)) return (false, $"{scriptFileName} not found");
@@ -25,7 +25,7 @@ namespace SocialMediaDataScraper.Models
             return (true, scriptText);
         }
 
-        private static (JObject, List<string>) FindJsonNodeFromScripts(string html, string keyword)
+        private (JObject, List<string>) FindJsonNodeFromScripts(string html, string keyword)
         {
             ArgumentNullException.ThrowIfNull(html, nameof(html));
             ArgumentNullException.ThrowIfNull(keyword, nameof(keyword));
@@ -58,7 +58,7 @@ namespace SocialMediaDataScraper.Models
             return (null, ["Jons not found in script"]);
         }
 
-        private static JObject FindNodeByKey(JToken token, string targetKey)
+        private JObject FindNodeByKey(JToken token, string targetKey)
         {
             if (token.Type == JTokenType.Object)
             {
@@ -86,7 +86,7 @@ namespace SocialMediaDataScraper.Models
             return null;
         }
 
-        private static void NavigateOrReload(WebView2 webView, string requestUrl)
+        private void NavigateOrReload(WebView2 webView, string requestUrl)
         {
             if (webView.Source.ToString().Equals(requestUrl, StringComparison.CurrentCultureIgnoreCase))
             {
@@ -98,18 +98,18 @@ namespace SocialMediaDataScraper.Models
             }
         }
 
-        private static void SendTaskProgress<T>(InstaBulkTaskParams<T> taskParams, string message, bool breakLoop = false, int breakLoopWait = 0) where T : class, new()
+        private void SendTaskProgress<T>(InstaBulkTaskParams<T> taskParams, string message, bool breakLoop = false, TimeSpan? breakLoopWait = null) where T : class, new()
         {
             taskParams.TaskProgress?.Invoke(taskParams.WebView, new InstaPostProgressArgs<T>()
             {
                 Message = message,
                 BreakLoop = breakLoop,
-                BreakLoopWait = breakLoopWait
+                BreakLoopWait = breakLoopWait ?? TimeSpan.Zero
             });
         }
 
 
-        private static async Task<(bool, string, List<string>)> GetWebResponseContent(CoreWebView2WebResourceResponseReceivedEventArgs e)
+        private async Task<(bool, string, List<string>)> GetWebResponseContent(CoreWebView2WebResourceResponseReceivedEventArgs e)
         {
             var errors = new List<string>();
             if (e.Response == null)
@@ -142,7 +142,7 @@ namespace SocialMediaDataScraper.Models
             return (true, content, errors);
         }
 
-        private static async Task<(bool, JObject, List<string>)> GetWebResponseJsonObject(CoreWebView2WebResourceResponseReceivedEventArgs e)
+        private async Task<(bool, JObject, List<string>)> GetWebResponseJsonObject(CoreWebView2WebResourceResponseReceivedEventArgs e)
         {
             var (status, content, errors) = await GetWebResponseContent(e);
             if (!status) return (status, null, errors);
@@ -157,7 +157,7 @@ namespace SocialMediaDataScraper.Models
             return (true, root, errors);
         }
 
-        private static async Task<WebViewJsExecuteResult> ExecuteJsAsync(WebView2 webView, string jsCode, int waitInSeconds = 15)
+        private async Task<WebViewJsExecuteResult> ExecuteJsAsync(WebView2 webView, string jsCode, int waitInSeconds = 15)
         {
             var tcs = new TaskCompletionSource<WebViewJsExecuteResult>();
 
@@ -222,7 +222,7 @@ namespace SocialMediaDataScraper.Models
         }
 
 
-        public static async Task<InstaResult<List<InstaReel>>> TestLogin(WebView2 webView, string username, TimeSpan? waitInSeconds = null)
+        public async Task<InstaResult<List<InstaReel>>> TestLogin(WebView2 webView, string username, TimeSpan? waitInSeconds = null)
         {
             var requestFilter = "graphql/query";
             var requestUrl = $"https://www.instagram.com/{username}";
@@ -305,17 +305,18 @@ namespace SocialMediaDataScraper.Models
         }
 
 
-        public static async Task<InstaResult<InstaProfile>> GetProfileByUsername(WebView2 webView, string username, int waitInSeconds = 60)
+        public async Task<InstaResult<InstaProfile>> GetProfileByUsername(WebView2 webView, string username, TimeSpan? waitInSeconds = null)
         {
             var requestUrl = $"https://www.instagram.com/{username}";
             return await GetProfileByUrl(webView, requestUrl, waitInSeconds);
         }
 
-        public static async Task<InstaResult<InstaProfile>> GetProfileByUrl(WebView2 webView, string requestUrl, int waitInSeconds = 60)
+        public async Task<InstaResult<InstaProfile>> GetProfileByUrl(WebView2 webView, string requestUrl, TimeSpan? waitInSeconds = null)
         {
+            var username = new Uri(requestUrl).AbsolutePath.Trim('/');
             var requestFilter = "graphql/query";
             var tcs = new TaskCompletionSource<InstaResult<InstaProfile>>();
-            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(waitInSeconds));
+            var cts = new CancellationTokenSource(waitInSeconds ?? TimeSpan.FromSeconds(15));
             var errors = new List<string>();
 
             bool IsValidRequest(CoreWebView2WebResourceRequest Request)
@@ -385,16 +386,16 @@ namespace SocialMediaDataScraper.Models
         }
 
 
-        public static async Task<InstaResult<InstaPostVr2>> GetPostByShortCode(WebView2 webView, string postShortCode, int waitInSeconds = 60)
+        public async Task<InstaResult<InstaPostVr2>> GetPostByShortCode(WebView2 webView, string postShortCode, TimeSpan? waitInSeconds = null)
         {
             var requestUrl = $"https://www.instagram.com/p/{postShortCode}";
             return await GetPostByUrl(webView, requestUrl, waitInSeconds);
         }
 
-        public static async Task<InstaResult<InstaPostVr2>> GetPostByUrl(WebView2 webView, string requestUrl, int waitInSeconds = 60)
+        public async Task<InstaResult<InstaPostVr2>> GetPostByUrl(WebView2 webView, string requestUrl, TimeSpan? waitInSeconds = null)
         {
             var tcs = new TaskCompletionSource<InstaResult<InstaPostVr2>>();
-            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(waitInSeconds));
+            var cts = new CancellationTokenSource(waitInSeconds ?? TimeSpan.FromSeconds(15));
             var errors = new List<string>();
 
             bool IsValidRequest(CoreWebView2WebResourceRequest Request)
@@ -478,14 +479,15 @@ namespace SocialMediaDataScraper.Models
         }
 
 
-        public static async Task<InstaResult<List<InstaPost>>> GetPostsByUsername(string username, InstaBulkTaskParams<InstaPost> taskParams)
+        public async Task<InstaResult<List<InstaPost>>> GetPostsByUsername(string username, InstaBulkTaskParams<InstaPost> taskParams)
         {
             var requestUrl = $"https://www.instagram.com/{username}";
             return await GetPostsByUrl(requestUrl, taskParams);
         }
 
-        public static async Task<InstaResult<List<InstaPost>>> GetPostsByUrl(string requestUrl, InstaBulkTaskParams<InstaPost> taskParams)
+        public async Task<InstaResult<List<InstaPost>>> GetPostsByUrl(string requestUrl, InstaBulkTaskParams<InstaPost> taskParams)
         {
+            var username = new Uri(requestUrl).AbsolutePath.Trim('/');
             var requestFilter = "graphql/query";
             var collection = new List<InstaPost>();
             var requests = new Dictionary<string, bool>();
@@ -587,7 +589,7 @@ namespace SocialMediaDataScraper.Models
                     if (successAttempts > 0 && successAttempts % taskParams.LoopBreakAttempts == 0)
                     {
                         var wait = random.Next(15, 60);
-                        SendTaskProgress(taskParams, $"Break loop wait for {wait} seconds...", true, wait);
+                        SendTaskProgress(taskParams, $"Break loop wait for {wait} seconds...", true, TimeSpan.FromSeconds(wait));
                         await Task.Delay(TimeSpan.FromSeconds(wait), taskParams.CancellationToken.Token);
                         continue;
                     }
@@ -596,6 +598,8 @@ namespace SocialMediaDataScraper.Models
                     SendTaskProgress(taskParams, $"Wait for {timeWait} seconds...");
                     await Task.Delay(TimeSpan.FromSeconds(timeWait), taskParams.CancellationToken.Token);
                 }
+
+                collection.ForEach(x => x.username = username);
 
                 return new InstaResult<List<InstaPost>>()
                 {
@@ -620,13 +624,13 @@ namespace SocialMediaDataScraper.Models
         }
 
 
-        public static async Task<InstaResult<List<InstaFollowing>>> GetFollowingsByUsername(string username, InstaBulkTaskParams<InstaFollowing> taskParams)
+        public async Task<InstaResult<List<InstaFollowing>>> GetFollowingsByUsername(string username, InstaBulkTaskParams<InstaFollowing> taskParams)
         {
             var requestUrl = $"https://www.instagram.com/{username}/following/";
             return await GetFollowingsByUrl(requestUrl, taskParams);
         }
 
-        public static async Task<InstaResult<List<InstaFollowing>>> GetFollowingsByUrl(string requestUrl, InstaBulkTaskParams<InstaFollowing> taskParams)
+        public async Task<InstaResult<List<InstaFollowing>>> GetFollowingsByUrl(string requestUrl, InstaBulkTaskParams<InstaFollowing> taskParams)
         {
             var requestFilter = "api/v1/friendships";
             var requests = new Dictionary<string, bool>();
@@ -728,7 +732,7 @@ namespace SocialMediaDataScraper.Models
                     if (successAttempts > 0 && successAttempts % taskParams.LoopBreakAttempts == 0)
                     {
                         var wait = random.Next(15, 60);
-                        SendTaskProgress(taskParams, $"Break loop wait for {wait} seconds...", true, wait);
+                        SendTaskProgress(taskParams, $"Break loop wait for {wait} seconds...", true, TimeSpan.FromSeconds(wait));
                         await Task.Delay(TimeSpan.FromSeconds(wait), taskParams.CancellationToken.Token);
                         continue;
                     }
@@ -760,7 +764,7 @@ namespace SocialMediaDataScraper.Models
             }
         }
 
-        public static async Task<InstaResult<List<InstaFollowing>>> GetFollowingsAjax(string userPk, string username, InstaBulkTaskParams<InstaFollowing> taskParams)
+        public async Task<InstaResult<List<InstaFollowing>>> GetFollowingsAjax(string userPk, string username, InstaBulkTaskParams<InstaFollowing> taskParams)
         {
             var scriptName = "AjaxGetFollowings.js";
             var collection = new List<InstaFollowing>();
@@ -769,22 +773,12 @@ namespace SocialMediaDataScraper.Models
             var hasMore = false;
             var nextMaxId = 0;
 
-            void SendTaskProgress(string message, bool breakLoop = false, int breakLoopWait = 0)
-            {
-                taskParams.TaskProgress?.Invoke(taskParams.WebView, new InstaPostProgressArgs<InstaFollowing>()
-                {
-                    Message = message,
-                    BreakLoop = breakLoop,
-                    BreakLoopWait = breakLoopWait
-                });
-            }
-
             void ProcessAjaxResult(bool resultStatus, string result)
             {
                 if (!resultStatus)
                 {
                     failedAttempts++;
-                    SendTaskProgress(result);
+                    SendTaskProgress(taskParams, result);
                     return;
                 }
 
@@ -792,7 +786,7 @@ namespace SocialMediaDataScraper.Models
                 if (root == null)
                 {
                     failedAttempts++;
-                    SendTaskProgress($"Root object is null, failed attempts {failedAttempts}");
+                    SendTaskProgress(taskParams, $"Root object is null, failed attempts {failedAttempts}");
                     return;
                 }
 
@@ -801,7 +795,7 @@ namespace SocialMediaDataScraper.Models
                 {
                     failedAttempts++;
                     var error = root["error"]?.Value<string>();
-                    SendTaskProgress($"{error ?? "Unknown error"}, {failedAttempts}");
+                    SendTaskProgress(taskParams, $"{error ?? "Unknown error"}, {failedAttempts}");
                     return;
                 }
 
@@ -809,7 +803,7 @@ namespace SocialMediaDataScraper.Models
                 if (users == null)
                 {
                     failedAttempts++;
-                    SendTaskProgress($"Unable to find users, {failedAttempts}");
+                    SendTaskProgress(taskParams, $"Unable to find users, {failedAttempts}");
                     return;
                 }
 
@@ -832,7 +826,7 @@ namespace SocialMediaDataScraper.Models
 
                 successAttempts++;
                 collection.AddRange(list);
-                SendTaskProgress($"{list.Count}/{collection.Count}/{taskParams.RecordsCount} records collected, attempt {successAttempts}");
+                SendTaskProgress(taskParams, $"{list.Count}/{collection.Count}/{taskParams.RecordsCount} records collected, attempt {successAttempts}");
             }
 
             async Task CallAjaxAsync()
@@ -871,13 +865,13 @@ namespace SocialMediaDataScraper.Models
                     if (successAttempts % taskParams.LoopBreakAttempts == 0)
                     {
                         var wait = random.Next(15, 60);
-                        SendTaskProgress($"Break loop wait for {wait} seconds...", true, wait);
+                        SendTaskProgress(taskParams, $"Break loop wait for {wait} seconds...", true, TimeSpan.FromSeconds(wait));
                         await Task.Delay(TimeSpan.FromSeconds(wait), taskParams.CancellationToken.Token);
                         continue;
                     }
 
                     var timeWait = random.Next(taskParams.MinWait, taskParams.MaxWait);
-                    SendTaskProgress($"Wait for {timeWait} seconds...");
+                    SendTaskProgress(taskParams, $"Wait for {timeWait} seconds...");
                     await Task.Delay(TimeSpan.FromSeconds(timeWait), taskParams.CancellationToken.Token);
                 }
 
@@ -899,7 +893,7 @@ namespace SocialMediaDataScraper.Models
         }
 
 
-        public static async Task<InstaResult<List<InstaComment>>> GetPostComments(string postShortCode, InstaBulkTaskParams<InstaComment> taskParams)
+        public async Task<InstaResult<List<InstaComment>>> GetPostComments(string postShortCode, InstaBulkTaskParams<InstaComment> taskParams)
         {
             var requestFilter = "graphql/query";
             var requestUrl = $"https://www.instagram.com/p/{postShortCode}/comments/";
@@ -956,10 +950,12 @@ namespace SocialMediaDataScraper.Models
 
                     if (e.Request.Uri == requestUrl)
                     {
-                        var (obj, scriptParseErrors) = FindJsonNodeFromScripts(content, "xdt_api__v1__media__shortcode__web_info");
+                        var (obj, scriptParseErrors) = FindJsonNodeFromScripts(content, responseFilterValue);
                         if (obj is null)
                         {
-                            SendTaskProgress(taskParams, $"Unable to find script, failed {++failedAttempts}");
+                            failedAttempts++;
+                            SendTaskProgress(taskParams, $"Required keywords not found on page script tag, failed {failedAttempts}");
+                            taskParams.CancellationToken.Cancel();
                             return;
                         }
 
@@ -967,7 +963,8 @@ namespace SocialMediaDataScraper.Models
                         var edges = obj["edges"] as JArray;
                         if (edges is null || !edges.Any())
                         {
-                            SendTaskProgress(taskParams, $"Unable to get edges, failed {++failedAttempts}");
+                            failedAttempts++;
+                            SendTaskProgress(taskParams, $"Unable to get edges, failed {failedAttempts}");
                             return;
                         }
 
@@ -1052,7 +1049,7 @@ namespace SocialMediaDataScraper.Models
                     if (successAttempts > 0 && successAttempts % taskParams.LoopBreakAttempts == 0)
                     {
                         var wait = random.Next(15, 60);
-                        SendTaskProgress(taskParams, $"Break loop wait for {wait} seconds...", true, wait);
+                        SendTaskProgress(taskParams, $"Break loop wait for {wait} seconds...", true, TimeSpan.FromSeconds(wait));
                         await Task.Delay(TimeSpan.FromSeconds(wait), taskParams.CancellationToken.Token);
                         continue;
                     }
@@ -1179,6 +1176,7 @@ namespace SocialMediaDataScraper.Models
         [BsonId]
         public ObjectId _id { get; set; }
         public string id { get; set; }
+        public string username { get; set; }
         public string code { get; set; }
         public InstaCaption caption { get; set; }
         public string product_type { get; set; }
@@ -1431,7 +1429,7 @@ namespace SocialMediaDataScraper.Models
         public string Message { get; set; }
         public List<T> Data { get; set; }
         public bool BreakLoop { get; set; }
-        public int BreakLoopWait { get; set; }
+        public TimeSpan BreakLoopWait { get; set; }
     }
 
     ///////////////////////////////////

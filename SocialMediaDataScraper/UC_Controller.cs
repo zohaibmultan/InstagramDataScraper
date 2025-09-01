@@ -13,15 +13,16 @@ namespace SocialMediaDataScraper
 {
     public partial class UC_Controller : UserControl
     {
+        private BindingList<DS_BrowserLog> logs { get; set; } = [];
         private DS_Browser dsBrowser { get; set; }
-        private BindingList<DS_BrowserLog> logs { get; set; } = new BindingList<DS_BrowserLog>();
         private WebView2 webView { get; set; }
-
+        private InstaHelper instaHelper { get; set; }
 
         public UC_Controller()
         {
             InitializeComponent();
 
+            instaHelper = new InstaHelper();
             listBox.DataSource = logs;
             listBox.DisplayMember = nameof(DS_BrowserLog.Text);
             listBox.ValueMember = nameof(DS_BrowserLog.ID);
@@ -83,7 +84,7 @@ namespace SocialMediaDataScraper
         {
             var logId = Log(DS_BrowserLogType.Info, "Checking user is login...");
 
-            var res = await InstaHelper.TestLogin(webView, dsBrowser.Username);
+            var res = await instaHelper.TestLogin(webView, dsBrowser.Username);
             if (!res.Status)
             {
                 Log(DS_BrowserLogType.Error, "Failed", logId, true);
@@ -107,12 +108,12 @@ namespace SocialMediaDataScraper
             if (!string.IsNullOrEmpty(query.Username))
             {
                 Log(DS_BrowserLogType.Info, $"Getting profile {query.Username}...");
-                data = await InstaHelper.GetProfileByUsername(webView, query.Username);
+                data = await instaHelper.GetProfileByUsername(webView, query.Username);
             }
             else if (!string.IsNullOrEmpty(query.ProfileUrl))
             {
                 Log(DS_BrowserLogType.Info, $"Getting profile {query.ProfileUrl}...");
-                data = await InstaHelper.GetProfileByUrl(webView, query.ProfileUrl);
+                data = await instaHelper.GetProfileByUrl(webView, query.ProfileUrl);
             }
 
             if (data != null && data.Status)
@@ -149,12 +150,12 @@ namespace SocialMediaDataScraper
             if (!string.IsNullOrEmpty(query.PostShortCode))
             {
                 Log(DS_BrowserLogType.Info, $"Getting post {query.PostShortCode}...");
-                data = await InstaHelper.GetPostByShortCode(webView, query.PostShortCode);
+                data = await instaHelper.GetPostByShortCode(webView, query.PostShortCode);
             }
             else if (!string.IsNullOrEmpty(query.PostUrl))
             {
                 Log(DS_BrowserLogType.Info, $"Getting post {query.PostUrl}...");
-                data = await InstaHelper.GetPostByUrl(webView, query.PostUrl);
+                data = await instaHelper.GetPostByUrl(webView, query.PostUrl);
             }
 
             if (data != null && data.Status)
@@ -200,7 +201,7 @@ namespace SocialMediaDataScraper
             if (!string.IsNullOrEmpty(query.Username))
             {
                 Log(DS_BrowserLogType.Info, $"Getting posts {query.Username}...");
-                data = await InstaHelper.GetPostsByUsername(
+                data = await instaHelper.GetPostsByUsername(
                     query.Username,
                     new InstaBulkTaskParams<InstaPost>()
                     {
@@ -222,7 +223,7 @@ namespace SocialMediaDataScraper
             else if (!string.IsNullOrEmpty(query.ProfileUrl))
             {
                 Log(DS_BrowserLogType.Info, $"Getting posts {query.ProfileUrl}...");
-                data = data = await InstaHelper.GetPostsByUrl(
+                data = data = await instaHelper.GetPostsByUrl(
                     query.ProfileUrl,
                     new InstaBulkTaskParams<InstaPost>()
                     {
@@ -276,7 +277,7 @@ namespace SocialMediaDataScraper
             if (!string.IsNullOrEmpty(query.Username))
             {
                 Log(DS_BrowserLogType.Info, $"Getting followings {query.Username}...");
-                var data = await InstaHelper.GetFollowingsByUsername(
+                var data = await instaHelper.GetFollowingsByUsername(
                     query.Username,
                     new InstaBulkTaskParams<InstaFollowing>()
                     {
@@ -299,7 +300,7 @@ namespace SocialMediaDataScraper
             else if (!string.IsNullOrEmpty(query.ProfileUrl))
             {
                 Log(DS_BrowserLogType.Info, $"Getting followings {query.ProfileUrl}...");
-                var data = await InstaHelper.GetFollowingsByUrl(
+                var data = await instaHelper.GetFollowingsByUrl(
                     query.ProfileUrl,
                     new InstaBulkTaskParams<InstaFollowing>()
                     {
@@ -335,7 +336,7 @@ namespace SocialMediaDataScraper
             btn_stopCommand.Click += canellationEvent;
 
             Log(DS_BrowserLogType.Info, $"Getting followings {query.Username}...");
-            var data = await InstaHelper.GetFollowingsAjax(
+            var data = await instaHelper.GetFollowingsAjax(
                 query.UserPK.ToString(),
                 query.Username,
                 new InstaBulkTaskParams<InstaFollowing>()
@@ -371,7 +372,7 @@ namespace SocialMediaDataScraper
             btn_stopCommand.Click += canellationEvent;
 
             Log(DS_BrowserLogType.Info, $"Getting post comments {query.PostShortCode}...");
-            var data = await InstaHelper.GetPostComments(
+            var data = await instaHelper.GetPostComments(
                 query.PostShortCode,
                 new InstaBulkTaskParams<InstaComment>()
                 {
@@ -395,7 +396,7 @@ namespace SocialMediaDataScraper
             Log(DS_BrowserLogType.Info, $"-------- GET POST COMMENTS END --------");
         }
 
-        private void BreakLoop(int time)
+        private void BreakLoop(TimeSpan time)
         {
             var title = dsBrowser.Username + " - Loop Breaker - Close in ";
             var uc_webView = new UC_WebView()
@@ -426,14 +427,14 @@ namespace SocialMediaDataScraper
             };
             timer.Start();
 
-            var remainingTime = time;
+            var remainingTime = time.Seconds;
             var ticker = new System.Timers.Timer(1000)
             {
                 AutoReset = true
             };
             ticker.Elapsed += (s, e) =>
             {
-                form.SafeInvoke(() => form.Text = title + (remainingTime -= 1000) / 1000 + " seconds");
+                form.SafeInvoke(() => form.Text = title + (remainingTime -= 1) + " seconds");
             };
             ticker.Start();
 

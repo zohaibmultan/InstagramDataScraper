@@ -1,7 +1,6 @@
 ﻿# 📸 Instagram Data Scraper (Fully GUI-Based)
 
-An **intuitive, user-friendly, and fully GUI-based Instagram Data Scraper** designed for everyone — no coding skills required!  
-With a **sleek interface** and **real-time progress tracking**, you can easily scrape Instagram data like posts, profiles, followings, and comments.  
+An **intuitive, user-friendly, and fully GUI-based Instagram Data Scraper** designed for everyone — no coding skills required! With a **sleek interface** and **real-time progress tracking**, you can easily scrape Instagram data like posts, profiles, followings, and comments.  
 
 > ⚡ Perfect for **market research**, **influencer analysis**, and **content monitoring** — while ensuring compliance with Instagram’s Terms of Service.  
 
