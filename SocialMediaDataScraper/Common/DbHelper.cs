@@ -13,11 +13,11 @@ namespace SocialMediaDataScraper.Common
 {
     public static class DbHelper
     {
-        private static string databaseName = @"Filename=D:\04_Practice\SocialMediaDataScraper\SocialMediaDataScraper\database.db;Connection=shared";
+        private static string connectionString = @"Filename=D:\04_Practice\SocialMediaDataScraper\SocialMediaDataScraper\database.db;Connection=shared";
 
         public static T SaveOne<T>(T model, Expression<Func<T, bool>> condition = null) where T : class
         {
-            using var db = new LiteDatabase(databaseName);
+            using var db = new LiteDatabase(connectionString);
             var col = db.GetCollection<T>();
 
             if (condition != null)
@@ -36,7 +36,7 @@ namespace SocialMediaDataScraper.Common
 
         public static bool SaveMany<T>(List<T> models, Expression<Func<T, bool>> condition = null) where T : class
         {
-            using var db = new LiteDatabase(databaseName);
+            using var db = new LiteDatabase(connectionString);
             var col = db.GetCollection<T>();
 
             bool anySaved = false;
@@ -63,14 +63,14 @@ namespace SocialMediaDataScraper.Common
 
         public static bool UpdateOne<T>(T model, Expression<Func<T, bool>> condition = null) where T : class
         {
-            using var db = new LiteDatabase(databaseName);
+            using var db = new LiteDatabase(connectionString);
             var col = db.GetCollection<T>();
             return col.Update(model);
         }
 
         public static bool UpdateMany<T>(List<T> models, Expression<Func<T, bool>> condition = null) where T : class
         {
-            using var db = new LiteDatabase(databaseName);
+            using var db = new LiteDatabase(connectionString);
             var col = db.GetCollection<T>();
 
             int updatedCount = 0;
@@ -96,14 +96,14 @@ namespace SocialMediaDataScraper.Common
 
         public static bool Delete<T>(ObjectId id) where T : class
         {
-            using var db = new LiteDatabase(databaseName);
+            using var db = new LiteDatabase(connectionString);
             var col = db.GetCollection<T>();
             return col.Delete(id);
         }
 
         public static bool DeleteMany<T>(Expression<Func<T, bool>> condition) where T : class
         {
-            using var db = new LiteDatabase(databaseName);
+            using var db = new LiteDatabase(connectionString);
             var col = db.GetCollection<T>();
             var res = col.DeleteMany(condition);
             return res >= 0;
@@ -111,21 +111,21 @@ namespace SocialMediaDataScraper.Common
 
         public static List<T> GetAll<T>() where T : class
         {
-            using var db = new LiteDatabase(databaseName);
+            using var db = new LiteDatabase(connectionString);
             var col = db.GetCollection<T>();
             return col.FindAll().ToList();
         }
 
         public static T GetOne<T>(Expression<Func<T, bool>> condition) where T : class
         {
-            using var db = new LiteDatabase(databaseName);
+            using var db = new LiteDatabase(connectionString);
             var col = db.GetCollection<T>();
             return col.FindOne(condition);
         }
 
         public static List<T> Get<T>(Expression<Func<T, bool>> condition) where T : class
         {
-            using var db = new LiteDatabase(databaseName);
+            using var db = new LiteDatabase(connectionString);
             var col = db.GetCollection<T>();
             return col.Find(condition).ToList();
         }

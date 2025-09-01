@@ -14,6 +14,7 @@ namespace SocialMediaDataScraper
             var list = DbHelper.GetAll<DS_Browser>();
             ApplicationConfiguration.Initialize();
             Application.Run(new FormDsBrowser(list.First()));
+            //Application.Run(new MainForm());
         }
     }
 }

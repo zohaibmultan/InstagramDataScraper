@@ -623,7 +623,7 @@ namespace SocialMediaDataScraper.Models
         public static async Task<InstaResult<List<InstaFollowing>>> GetFollowingsByUsername(string username, InstaBulkTaskParams<InstaFollowing> taskParams)
         {
             var requestUrl = $"https://www.instagram.com/{username}/following/";
-            return await GetFollowingsByUrl(webView, requestUrl, cancellationToken, followingCount, minWait, maxWait, taskProgress, loopBreakAttemps);
+            return await GetFollowingsByUrl(requestUrl, taskParams);
         }
 
         public static async Task<InstaResult<List<InstaFollowing>>> GetFollowingsByUrl(string requestUrl, InstaBulkTaskParams<InstaFollowing> taskParams)

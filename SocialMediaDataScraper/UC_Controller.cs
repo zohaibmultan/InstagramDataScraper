@@ -201,36 +201,44 @@ namespace SocialMediaDataScraper
             {
                 Log(DS_BrowserLogType.Info, $"Getting posts {query.Username}...");
                 data = await InstaHelper.GetPostsByUsername(
-                    webView,
                     query.Username,
-                    cancellationToken,
-                    query.RecordsCount,
-                    query.MinWait,
-                    query.MaxWait,
-                    (s, e) =>
+                    new InstaBulkTaskParams<InstaPost>()
                     {
-                        Log(DS_BrowserLogType.Info, e.Message);
-                        if (e.BreakLoop) BreakLoop(e.BreakLoopWait);
-                    },
-                    query.LoopBreak
+                        WebView = webView,
+                        CancellationToken = cancellationToken,
+                        RecordsCount = query.RecordsCount,
+                        MinWait = query.MinWait,
+                        MaxWait = query.MaxWait,
+                        TaskProgress = (s, e) =>
+                        {
+                            Log(DS_BrowserLogType.Info, e.Message);
+                            if (e.BreakLoop) BreakLoop(e.BreakLoopWait);
+                        },
+                        LoopBreakAttempts = query.LoopBreak,
+                        FailedAttempts = 3,
+                    }
                 );
             }
             else if (!string.IsNullOrEmpty(query.ProfileUrl))
             {
                 Log(DS_BrowserLogType.Info, $"Getting posts {query.ProfileUrl}...");
                 data = data = await InstaHelper.GetPostsByUrl(
-                    webView,
                     query.ProfileUrl,
-                    cancellationToken,
-                    query.RecordsCount,
-                    query.MinWait,
-                    query.MaxWait,
-                    (s, e) =>
+                    new InstaBulkTaskParams<InstaPost>()
                     {
-                        Log(DS_BrowserLogType.Info, e.Message);
-                        if (e.BreakLoop) BreakLoop(e.BreakLoopWait);
-                    },
-                    query.LoopBreak
+                        WebView = webView,
+                        CancellationToken = cancellationToken,
+                        RecordsCount = query.RecordsCount,
+                        MinWait = query.MinWait,
+                        MaxWait = query.MaxWait,
+                        TaskProgress = (s, e) =>
+                        {
+                            Log(DS_BrowserLogType.Info, e.Message);
+                            if (e.BreakLoop) BreakLoop(e.BreakLoopWait);
+                        },
+                        LoopBreakAttempts = query.LoopBreak,
+                        FailedAttempts = 3,
+                    }
                 );
             }
 
@@ -269,18 +277,22 @@ namespace SocialMediaDataScraper
             {
                 Log(DS_BrowserLogType.Info, $"Getting followings {query.Username}...");
                 var data = await InstaHelper.GetFollowingsByUsername(
-                    webView,
                     query.Username,
-                    cancellationToken,
-                    query.RecordsCount,
-                    query.MinWait,
-                    query.MaxWait,
-                    (s, e) =>
+                    new InstaBulkTaskParams<InstaFollowing>()
                     {
-                        Log(DS_BrowserLogType.Info, e.Message);
-                        if (e.BreakLoop) BreakLoop(e.BreakLoopWait);
-                    },
-                    query.LoopBreak
+                        WebView = webView,
+                        CancellationToken = cancellationToken,
+                        RecordsCount = query.RecordsCount,
+                        MinWait = query.MinWait,
+                        MaxWait = query.MaxWait,
+                        TaskProgress = (s, e) =>
+                        {
+                            Log(DS_BrowserLogType.Info, e.Message);
+                            if (e.BreakLoop) BreakLoop(e.BreakLoopWait);
+                        },
+                        LoopBreakAttempts = query.LoopBreak,
+                        FailedAttempts = 3,
+                    }
                 );
                 SaveData<List<InstaFollowing>, InstaFollowing>(data);
             }
@@ -288,18 +300,22 @@ namespace SocialMediaDataScraper
             {
                 Log(DS_BrowserLogType.Info, $"Getting followings {query.ProfileUrl}...");
                 var data = await InstaHelper.GetFollowingsByUrl(
-                    webView,
                     query.ProfileUrl,
-                    cancellationToken,
-                    query.RecordsCount,
-                    query.MinWait,
-                    query.MaxWait,
-                    (s, e) =>
+                    new InstaBulkTaskParams<InstaFollowing>()
                     {
-                        Log(DS_BrowserLogType.Info, e.Message);
-                        if (e.BreakLoop) BreakLoop(e.BreakLoopWait);
-                    },
-                    query.LoopBreak
+                        WebView = webView,
+                        CancellationToken = cancellationToken,
+                        RecordsCount = query.RecordsCount,
+                        MinWait = query.MinWait,
+                        MaxWait = query.MaxWait,
+                        TaskProgress = (s, e) =>
+                        {
+                            Log(DS_BrowserLogType.Info, e.Message);
+                            if (e.BreakLoop) BreakLoop(e.BreakLoopWait);
+                        },
+                        LoopBreakAttempts = query.LoopBreak,
+                        FailedAttempts = 3,
+                    }
                 );
                 SaveData<List<InstaFollowing>, InstaFollowing>(data);
             }
