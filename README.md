@@ -1,7 +1,6 @@
 # 📸 Instagram Data Scraper (Fully GUI-Based)
 
-An **intuitive, user-friendly, and fully GUI-based Instagram Data Scraper** designed for everyone — no coding skills required!  
-With a **sleek interface** and **real-time progress tracking**, you can easily scrape Instagram data like posts, profiles, followings, and comments.  
+An **intuitive, user-friendly, and fully GUI-based Instagram Data Scraper** designed for everyone — no coding skills required! With a **sleek interface** and **real-time progress tracking**, you can easily scrape Instagram data like posts, profiles, followings, and comments.  
 
 > ⚡ Perfect for **market research**, **influencer analysis**, and **content monitoring** — while ensuring compliance with Instagram’s Terms of Service.  
 
@@ -39,6 +38,15 @@ Before running the scraper, make sure you have:
 - [LiteDB](https://www.litedb.org/) 💾  
 
 ---
+## 🖼️ GUI Preview
+
+<p align="center">
+  <img src="__Screenshots__/gui-preview-2.png" width="700" alt="Instagram Data Scraper GUI">
+  <img src="__Screenshots__/gui-preview.png" width="700" alt="Instagram Data Scraper GUI">
+  <img src="__Screenshots__/db-preview.png" width="700" alt="Instagram Data Scraper GUI">
+</p>
+
+---
 
 ## 🚀 Getting Started
 
@@ -48,6 +56,17 @@ Before running the scraper, make sure you have:
    cd instagram-data-scraper
    ```
 
+2. **Change Database Connection String**
+   ```
+   File Path -- Common/DbHelper.cs
+
+   public static class DbHelper
+   {
+        private static string connectionString = @"Filename=<Path to your database>\<database name>.db;Connection=shared";
+        ...
+        ...
+   }
+   ```
 2. **Build & Run**  
    ```bash
    dotnet build
@@ -85,3 +104,6 @@ Feel free to **fork this repo** and submit a **pull request**. 🚀
 ## 📜 License
 
 This project is licensed under the **MIT License** – free to use, modify, and distribute.  
+
+
+Readme Last Updated - 2025-09-01
