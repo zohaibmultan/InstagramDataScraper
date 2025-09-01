@@ -44,7 +44,7 @@ Before running the scraper, make sure you have:
 
 1. **Clone this repository**  
    ```bash
-   git clone https://github.com/yourusername/instagram-data-scraper.git
+   git clone https://github.com/zohaibmultan/instagram-data-scraper.git
    cd instagram-data-scraper
    ```
 
