@@ -41,9 +41,9 @@ Before running the scraper, make sure you have:
 ## 🖼️ GUI Preview
 
 <p align="center">
-  <img src="__Screenshots__/gui-preview-2.png" width="700" alt="Instagram Data Scraper GUI">
-  <img src="__Screenshots__/gui-preview.png" width="700" alt="Instagram Data Scraper GUI">
-  <img src="__Screenshots__/db-preview.png" width="700" alt="Instagram Data Scraper GUI">
+  <img src="https://github.com/zohaibmultan/InstagramDataScraper/blob/master/SocialMediaDataScraper/__Screenshots__/db-preview.png" width="700" alt="Instagram Data Scraper GUI">
+  <img src="https://github.com/zohaibmultan/InstagramDataScraper/blob/master/SocialMediaDataScraper/__Screenshots__/gui-preview.png" width="700" alt="Instagram Data Scraper GUI">
+  <img src="https://github.com/zohaibmultan/InstagramDataScraper/blob/master/SocialMediaDataScraper/__Screenshots__/db-preview.png" width="700" alt="Instagram Data Scraper GUI">
 </p>
 
 ---
