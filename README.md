@@ -41,21 +41,9 @@ Before running the scraper, make sure you have:
 ## 🖼️ GUI Preview
 
 <p align="center">
-<<<<<<< HEAD
-<<<<<<< HEAD
   <img src="Screenshots/gui-preview-2.png" width="700" alt="Instagram Data Scraper GUI">
   <img src="Screenshots/gui-preview.png" width="700" alt="Instagram Data Scraper GUI">
   <img src="Screenshots/db-preview.png" width="700" alt="Instagram Data Scraper GUI">
-=======
-  <img src="__Screenshots__/gui-preview-2.png" width="700" alt="Instagram Data Scraper GUI">
-  <img src="__Screenshots__/gui-preview.png" width="700" alt="Instagram Data Scraper GUI">
-  <img src="__Screenshots__/db-preview.png" width="700" alt="Instagram Data Scraper GUI">
->>>>>>> c405872a4fbce0ace34d0d273619b2d543ec522e
-=======
-  <img src="https://github.com/zohaibmultan/InstagramDataScraper/blob/master/SocialMediaDataScraper/__Screenshots__/gui-preview.png" width="700" alt="Instagram Data Scraper GUI">
-  <img src="https://github.com/zohaibmultan/InstagramDataScraper/blob/master/SocialMediaDataScraper/__Screenshots__/gui-preview-2.png" width="700" alt="Instagram Data Scraper GUI">
-  <img src="https://github.com/zohaibmultan/InstagramDataScraper/blob/master/SocialMediaDataScraper/__Screenshots__/db-preview.png" width="700" alt="Instagram Data Scraper GUI">
->>>>>>> 7c58fae056840d9864113e18d1c6ef03d91aa8f4
 </p>
 
 ---
@@ -117,9 +105,4 @@ Feel free to **fork this repo** and submit a **pull request**. 🚀
 
 This project is licensed under the **MIT License** – free to use, modify, and distribute.  
 
-
-<<<<<<< HEAD
-Readme Last Updated - 2025-09-01
-=======
-Readme Last Updated - 2025-09-01
->>>>>>> c405872a4fbce0ace34d0d273619b2d543ec522e
+Readme Last Updated - 2025-09-02
