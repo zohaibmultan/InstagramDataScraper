@@ -29,9 +29,21 @@ namespace SocialMediaDataScraper
             return propertyGrid.SelectedObject;
         }
 
-        private void btn_save_Click(object sender, EventArgs e)
+        public static (bool, IEnumerable<string>) ValidateObject(object obj)
         {
-            Close();
+            if (obj == null) return (false, ["Object is null"]);
+
+            var context = new ValidationContext(obj, serviceProvider: null, items: null);
+            var results = new List<ValidationResult>();
+
+            bool valid = Validator.TryValidateObject(obj, context, results, validateAllProperties: true);
+
+            if (!valid)
+            {
+                return (false, results.Select(r => r.ErrorMessage));
+            }
+
+            return (true, null);
         }
 
         private void btn_cancel_Click(object sender, EventArgs e)
@@ -58,13 +70,23 @@ namespace SocialMediaDataScraper
 
             if (!valid)
             {
-                // show custom error message
-                MessageBox.Show(results[0].ErrorMessage, "Validation Error");
-
-                // rollback to old value
+                MessageBox.Show(results[0].ErrorMessage, "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 e.ChangedItem.PropertyDescriptor.SetValue(obj, e.OldValue);
                 propertyGrid.Refresh();
             }
+        }
+
+        private void btn_run_Click(object sender, EventArgs e)
+        {
+            var (status, errors) = ValidateObject(propertyGrid.SelectedObject);
+            if (!status)
+            {
+                MessageBox.Show(string.Join("\n", errors), "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            DialogResult = DialogResult.OK;
+            Close();
         }
     }
 }

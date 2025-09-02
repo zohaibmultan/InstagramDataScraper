@@ -29,7 +29,7 @@
         private void InitializeComponent()
         {
             propertyGrid = new PropertyGrid();
-            btn_save = new Button();
+            btn_run = new Button();
             btn_cancel = new Button();
             tableLayoutPanel1 = new TableLayoutPanel();
             tableLayoutPanel1.SuspendLayout();
@@ -42,22 +42,21 @@
             propertyGrid.Location = new Point(10, 55);
             propertyGrid.Name = "propertyGrid";
             propertyGrid.PropertySort = PropertySort.NoSort;
-            propertyGrid.Size = new Size(511, 211);
+            propertyGrid.Size = new Size(511, 361);
             propertyGrid.TabIndex = 0;
             propertyGrid.PropertyValueChanged += propertyGrid_PropertyValueChanged;
             // 
-            // btn_save
+            // btn_run
             // 
-            btn_save.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            btn_save.DialogResult = DialogResult.OK;
-            btn_save.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
-            btn_save.Location = new Point(3, 3);
-            btn_save.Name = "btn_save";
-            btn_save.Size = new Size(248, 30);
-            btn_save.TabIndex = 1;
-            btn_save.Text = "Run Task";
-            btn_save.UseVisualStyleBackColor = true;
-            btn_save.Click += btn_save_Click;
+            btn_run.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            btn_run.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
+            btn_run.Location = new Point(3, 3);
+            btn_run.Name = "btn_run";
+            btn_run.Size = new Size(248, 30);
+            btn_run.TabIndex = 1;
+            btn_run.Text = "Run Task";
+            btn_run.UseVisualStyleBackColor = true;
+            btn_run.Click += btn_run_Click;
             // 
             // btn_cancel
             // 
@@ -77,7 +76,7 @@
             tableLayoutPanel1.ColumnCount = 2;
             tableLayoutPanel1.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
             tableLayoutPanel1.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-            tableLayoutPanel1.Controls.Add(btn_save, 0, 0);
+            tableLayoutPanel1.Controls.Add(btn_run, 0, 0);
             tableLayoutPanel1.Controls.Add(btn_cancel, 1, 0);
             tableLayoutPanel1.Location = new Point(12, 12);
             tableLayoutPanel1.Name = "tableLayoutPanel1";
@@ -88,9 +87,10 @@
             // 
             // PropertyForm
             // 
+            AcceptButton = btn_run;
             AutoScaleDimensions = new SizeF(7F, 17F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(532, 277);
+            ClientSize = new Size(532, 427);
             Controls.Add(tableLayoutPanel1);
             Controls.Add(propertyGrid);
             Font = new Font("Segoe UI", 9.75F, FontStyle.Regular, GraphicsUnit.Point, 0);
@@ -105,7 +105,7 @@
         #endregion
 
         private PropertyGrid propertyGrid;
-        private Button btn_save;
+        private Button btn_run;
         private Button btn_cancel;
         private TableLayoutPanel tableLayoutPanel1;
     }

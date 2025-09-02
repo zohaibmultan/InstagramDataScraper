@@ -3,6 +3,10 @@
 using LiteDB;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.Design;
+using System.Drawing.Design;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -11,13 +15,34 @@ namespace SocialMediaDataScraper.Models
 {
     public class DS_Browser
     {
+        [BsonId]
+        [Browsable(false)]
         public ObjectId ID { get; set; }
-        public string UserAgent { get; set; }
+
+        [Required]
+        [Display(Name = "Username")]
+        [Description("Instagram username")]
         public string Username { get; set; }
+
         public string Password { get; set; }
+
+        [EmailAddress(ErrorMessage = "Invalid email address")]
         public string Email { get; set; }
+
+        [Display(Name = "Email Password")]
         public string EmailPassword { get; set; }
+
+        [Display(Name = "Is Active")]
+        public bool IsActive {  get; set; }
+
+        [Display(Name = "Is Running")]
         public bool IsRunning {  get; set; }
+
+        [Required]
+        [Display(Name = "User Agent")]
+        [Description("User agent for browser, must use IPhone Mobile Useragent")]
+        [Editor(typeof(MultilineStringEditor), typeof(UITypeEditor))]
+        public string UserAgent { get; set; }
     }
 
     public class DS_BrowserLog

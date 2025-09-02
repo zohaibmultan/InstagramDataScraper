@@ -14,6 +14,7 @@ namespace SocialMediaDataScraper
         {
             InitializeComponent();
             dsBrowser = browser;
+            Text = browser.Username + " | " + browser.Email;
 
             uc_webView = new UC_WebView()
             {
