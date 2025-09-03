@@ -3,13 +3,17 @@
 using LiteDB;
 using SocialMediaDataScraper.Common;
 using SocialMediaDataScraper.Models;
+using System.Collections.Generic;
 using System.ComponentModel;
+using System.Reflection;
+using System.Threading.Tasks;
 
 namespace SocialMediaDataScraper
 {
     public partial class MainForm : Form
     {
-        BindingList<DS_Browser> browsers = [];
+        BindingList<DS_Browser> accounts = [];
+        BindingList<DS_BrowserTask> tasks = [];
         Dictionary<string, FormDsBrowser> forms = [];
 
         public MainForm()
@@ -18,38 +22,82 @@ namespace SocialMediaDataScraper
 
             gv_browsers.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             gv_browsers.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            gv_browsers.MultiSelect = false;
+            gv_browsers.MultiSelect = true;
             gv_browsers.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.EnableResizing;
-            gv_browsers.ColumnHeadersHeight = 40;
-            gv_browsers.RowTemplate.Height = 40;
+            gv_browsers.ColumnHeadersHeight = 30;
+            gv_browsers.RowTemplate.Height = 30;
             gv_browsers.ReadOnly = true;
             gv_browsers.AllowUserToAddRows = false;
             gv_browsers.AllowUserToDeleteRows = false;
             gv_browsers.AllowUserToResizeRows = false;
             gv_browsers.RowHeadersVisible = false;
+
+            gv_tasks.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            gv_tasks.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            gv_tasks.MultiSelect = true;
+            gv_tasks.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.EnableResizing;
+            gv_tasks.ColumnHeadersHeight = 30;
+            gv_tasks.RowTemplate.Height = 30;
+            gv_tasks.ReadOnly = true;
+            gv_tasks.AllowUserToAddRows = false;
+            gv_tasks.AllowUserToDeleteRows = false;
+            gv_tasks.AllowUserToResizeRows = false;
+            gv_tasks.RowHeadersVisible = false;
         }
 
-        void LoadGrid()
+        void LoadAccountsGrid()
         {
-            gv_browsers.DataSource = browsers;
+            gv_browsers.DataSource = accounts;
             var data = DbHelper.GetAll<DS_Browser>();
-            browsers.Clear();
+            accounts.Clear();
 
             foreach (DS_Browser browser in data)
             {
-                browsers.Add(browser);
+                accounts.Add(browser);
             }
 
             gv_browsers.Refresh();
         }
 
-        DS_Browser GetSelectedRow()
+        void LoadTasksGrid()
         {
-            if (gv_browsers.SelectedRows.Count == 0) return null;
-            return gv_browsers.SelectedRows[0].DataBoundItem as DS_Browser;
+            tasks.Clear();
+            var data = DbHelper.GetAll<DS_BrowserTask>().OrderByDescending(x => x.CreatedAt);
+
+            foreach (DS_BrowserTask task in data)
+            {
+                tasks.Add(task);
+            }
+
+            gv_tasks.DataSource = tasks;
+            gv_tasks.Refresh();
+
+            gv_tasks.Columns[nameof(DS_BrowserTask.QueryData)].Visible = false;
         }
 
-        void ShowForm(DS_Browser model = null)
+        List<DS_Browser> GetSelectedAccounts()
+        {
+            var list = new List<DS_Browser>();
+            if (gv_browsers.SelectedRows.Count == 0) return list;
+
+            foreach (DataGridViewRow item in gv_browsers.SelectedRows)
+                list.Add(item.DataBoundItem as DS_Browser);
+
+            return list.Where(x => x != null).ToList();
+        }
+
+        List<DS_BrowserTask> GetSelectedTasks()
+        {
+            var list = new List<DS_BrowserTask>();
+            if (gv_tasks.SelectedRows.Count == 0) return list;
+
+            foreach (DataGridViewRow item in gv_tasks.SelectedRows)
+                list.Add(item.DataBoundItem as DS_BrowserTask);
+
+            return list.Where(x => x != null).ToList();
+        }
+
+        void ShowAccountForm(DS_Browser model = null)
         {
             var isNew = model == null;
             if (isNew)
@@ -67,7 +115,7 @@ namespace SocialMediaDataScraper
 
             var dbModel = DbHelper.SaveOne(model, x => x.ID == model.ID);
             if (dbModel == null) return;
-            if (isNew) browsers.Add(dbModel);
+            if (isNew) accounts.Add(dbModel);
             gv_browsers.Refresh();
         }
 
@@ -109,66 +157,87 @@ namespace SocialMediaDataScraper
             gv_browsers.Refresh();
         }
 
-        private void Form1_Load(object sender, EventArgs e)
-        {
 
+
+        private void MainForm_Shown(object sender, EventArgs e)
+        {
+            LoadAccountsGrid();
+            LoadTasksGrid();
         }
 
-        private void Form1_Shown(object sender, EventArgs e)
+        private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
         {
-            LoadGrid();
+            var ans = MessageBox.Show("Do you want to close?", "Confirm!", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (ans != DialogResult.Yes) e.Cancel = true;
+
+            foreach (var form in forms)
+            {
+                form.Value.CancelRunningTask();
+            }
         }
 
         private void btn_add_Click(object sender, EventArgs e)
         {
-            ShowForm();
+            ShowAccountForm();
+        }
+
+        private void btn_edit_Click(object sender, EventArgs e)
+        {
+            var items = GetSelectedAccounts();
+            if (items.Count == 0) return;
+            items.ForEach(x => ShowAccountForm(x));
         }
 
         private void btn_delete_Click(object sender, EventArgs e)
         {
-            var item = GetSelectedRow();
-            if (item == null || item.IsRunning) return;
+            var items = GetSelectedAccounts();
+            if (items.Count == 0) return;
 
-            var ans = MessageBox.Show("Do you want to delete?", "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            var ans = MessageBox.Show($"Do you want to delete {items.Count} records?", "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
             if (ans != DialogResult.Yes) return;
 
-            if (!DbHelper.Delete<DS_Browser>(item.ID)) return;
+            items.ForEach(item =>
+            {
+                if (DbHelper.Delete<DS_Browser>(item.ID))
+                {
+                    accounts.Remove(item);
+                }
+            });
 
-            browsers.Remove(item);
             gv_browsers.Refresh();
         }
 
         private void btn_start_Click(object sender, EventArgs e)
         {
-            var item = GetSelectedRow();
-            if (item == null) return;
-            StartBrowser(item);
+            var items = GetSelectedAccounts();
+            if (items == null) return;
+            items.ForEach(item => StartBrowser(item));
         }
 
         private void btn_stop_Click(object sender, EventArgs e)
         {
-            var item = GetSelectedRow();
-            if (item == null || !forms.ContainsKey(item.Username)) return;
-            StopBrowser(item);
-        }
+            var items = GetSelectedAccounts();
+            if (items.Count == 0) return;
 
-        private void btn_edit_Click(object sender, EventArgs e)
-        {
-            var item = GetSelectedRow();
-            if (item == null || item.IsRunning) return;
-            ShowForm(item);
+            items.ForEach(x =>
+            {
+                if (forms.ContainsKey(x.Username))
+                {
+                    StopBrowser(x);
+                }
+            });
         }
 
         private void gv_browsers_DoubleClick(object sender, EventArgs e)
         {
-            var item = GetSelectedRow();
-            if (item == null || item.IsRunning) return;
-            ShowForm(item);
+            var items = GetSelectedAccounts();
+            if (items.Count == 0) return;
+            ShowAccountForm(items.First());
         }
 
         private void btn_startAll_Click(object sender, EventArgs e)
         {
-            foreach (var item in browsers)
+            foreach (var item in accounts)
             {
                 if (item.IsActive)
                     StartBrowser(item);
@@ -177,10 +246,78 @@ namespace SocialMediaDataScraper
 
         private void btn_stopAll_Click(object sender, EventArgs e)
         {
-            foreach (var item in browsers)
+            foreach (var item in accounts)
             {
                 StopBrowser(item);
             }
+        }
+
+
+
+        private void btn_taskAdd_Click(object sender, EventArgs e)
+        {
+            var form = new TaskForm();
+            var res = form.ShowDialog();
+            if (res == DialogResult.OK)
+            {
+                tasks.Add(form.GetSelectedTask());
+                gv_tasks.Refresh();
+            }
+        }
+
+        private void btn_taskEdit_Click(object sender, EventArgs e)
+        {
+            var rows = GetSelectedTasks();
+            if (rows.Count == 0) return;
+
+            rows.ForEach(row =>
+            {
+                var form = new TaskForm(row);
+                var res = form.ShowDialog();
+                if (res == DialogResult.OK)
+                {
+                    gv_tasks.Refresh();
+                }
+            });
+        }
+
+        private void btn_taskDelete_Click(object sender, EventArgs e)
+        {
+            var rows = GetSelectedTasks();
+            if (rows.Count == 0) return;
+
+            var ans = MessageBox.Show($"Do you want to delete {rows.Count} records?", "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (ans != DialogResult.Yes) return;
+
+            foreach (var row in rows)
+            {
+                if (DbHelper.Delete<DS_BrowserTask>(row.ID))
+                {
+                    tasks.Remove(row);
+                }
+            }
+
+            gv_tasks.Refresh();
+        }
+
+        private void btn_taskStart_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void btn_taskStop_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void gv_tasks_DoubleClick(object sender, EventArgs e)
+        {
+            var tasks = GetSelectedTasks();
+            if (tasks.Count == 0) return;
+
+            var form = new TaskForm(tasks.First());
+            var res = form.ShowDialog();
+            if (res == DialogResult.OK) gv_tasks.Refresh();
         }
     }
 }

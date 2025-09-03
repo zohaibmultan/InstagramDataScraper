@@ -11,7 +11,7 @@ namespace SocialMediaDataScraper
         [STAThread]
         static void Main()
         {
-            var list = DbHelper.GetAll<DS_Browser>();
+            //var list = DbHelper.GetAll<DS_BrowserTask>();
             ApplicationConfiguration.Initialize();
             Application.Run(new MainForm());
         }

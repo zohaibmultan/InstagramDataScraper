@@ -40,7 +40,7 @@ namespace SocialMediaDataScraper
 
             if (!valid)
             {
-                return (false, results.Select(r => r.ErrorMessage));
+                return (false, results.Select(r => r.ErrorMessage).Distinct());
             }
 
             return (true, null);

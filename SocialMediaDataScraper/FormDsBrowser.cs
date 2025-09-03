@@ -7,8 +7,8 @@ namespace SocialMediaDataScraper
     public partial class FormDsBrowser : Form
     {
         DS_Browser dsBrowser;
-        UC_Controller uc_controller;
         UC_WebView uc_webView;
+        UC_Controller uc_controller;
 
         public FormDsBrowser(DS_Browser browser)
         {
@@ -56,6 +56,11 @@ namespace SocialMediaDataScraper
         private void FormDsBrowser_Shown(object sender, EventArgs e)
         {
             InitializeUserControls();
+        }
+
+        public void CancelRunningTask()
+        {
+            uc_controller?.cancellationToken?.Cancel();
         }
     }
 }

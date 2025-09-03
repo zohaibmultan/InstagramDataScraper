@@ -13,6 +13,9 @@ namespace SocialMediaDataScraper
 {
     public partial class UC_Controller : UserControl
     {
+        public bool isTaskRunning = false;
+        public CancellationTokenSource cancellationToken;
+
         private BindingList<DS_BrowserLog> logs { get; set; } = [];
         private DS_Browser dsBrowser { get; set; }
         private WebView2 webView { get; set; }
@@ -78,6 +81,57 @@ namespace SocialMediaDataScraper
 
                 return log.ID;
             }
+        }
+
+        private (DialogResult, T) ShowQueryDialog<T>() where T : class, new()
+        {
+            var model = Activator.CreateInstance<T>();
+            var result = new PropertyForm("Task Details", model).ShowDialog();
+            return (result, model);
+        }
+
+        private void SaveData<T1, T2>(InstaResult<T1> data) where T1 : class where T2 : class
+        {
+            if (data == null)
+            {
+                Log(DS_BrowserLogType.Error, "Collected data is null");
+                return;
+            }
+
+            if (!data.Status)
+            {
+                data.Errors?.ForEach(error => Log(DS_BrowserLogType.Error, error));
+                return;
+            }
+
+            var jsonData = JsonConvert.SerializeObject(data.Content, Formatting.Indented);
+            Log(DS_BrowserLogType.Info, $"Following data collected, Double click to view", content: jsonData);
+
+            var success = false;
+            if (data.Content is IList list)
+            {
+                var castedList = list.Cast<T2>().ToList();
+                success = DbHelper.SaveMany<T2>(castedList);
+            }
+            else if (data.Content is T1 obj)
+            {
+                var res = DbHelper.SaveOne(obj);
+                success = res != null;
+            }
+            else
+            {
+                Log(DS_BrowserLogType.Error, "Data content type is not supported");
+                return;
+            }
+
+            Log(success ? DS_BrowserLogType.Info : DS_BrowserLogType.Error, success ? "Following data saved" : "Unable to save following data");
+        }
+
+        private void CancelRunningTask(CancellationTokenSource cancellationToken)
+        {
+            var ans = MessageBox.Show("Do you want to cancel the task?", "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (ans != DialogResult.Yes) return;
+            cancellationToken.Cancel();
         }
 
         private async Task RecheckLoginStatus()
@@ -182,7 +236,7 @@ namespace SocialMediaDataScraper
         {
             var query = new QueryBulkPosts();
             InstaResult<List<InstaPost>> data = null;
-            var cancellationToken = new CancellationTokenSource();
+            cancellationToken = new CancellationTokenSource();
 
             void TaskCancel(object sender, EventArgs e)
             {
@@ -266,7 +320,7 @@ namespace SocialMediaDataScraper
 
         private async Task GetFollowings()
         {
-            var cancellationToken = new CancellationTokenSource();
+            cancellationToken = new CancellationTokenSource();
             EventHandler canellationEvent = (sender, e) => CancelRunningTask(cancellationToken);
             var (res, query) = ShowQueryDialog<QueryFollowing>();
             if (res != DialogResult.OK) return;
@@ -327,7 +381,7 @@ namespace SocialMediaDataScraper
 
         private async Task GetFollowingsAjax()
         {
-            var cancellationToken = new CancellationTokenSource();
+            cancellationToken = new CancellationTokenSource();
             EventHandler canellationEvent = (sender, e) => CancelRunningTask(cancellationToken);
             var (res, query) = ShowQueryDialog<QueryFollowingAjax>();
             if (res != DialogResult.OK) return;
@@ -363,7 +417,7 @@ namespace SocialMediaDataScraper
 
         private async Task GetPostComments()
         {
-            var cancellationToken = new CancellationTokenSource();
+            cancellationToken = new CancellationTokenSource();
             EventHandler canellationEvent = (sender, e) => CancelRunningTask(cancellationToken);
             var (res, query) = ShowQueryDialog<QueryPostComments>();
             if (res != DialogResult.OK) return;
@@ -448,6 +502,11 @@ namespace SocialMediaDataScraper
             };
         }
 
+        private void UC_Controller_Load(object sender, EventArgs e)
+        {
+            if (DesignMode) return;
+        }
+
         private void listBox_DoubleClick(object sender, EventArgs e)
         {
             var item = listBox.SelectedItem as DS_BrowserLog;
@@ -472,10 +531,10 @@ namespace SocialMediaDataScraper
 
         private async void btn_runCommand_Click(object sender, EventArgs e)
         {
+            if (isTaskRunning) return;
+
             void UpdateUI(bool enable)
             {
-                btn_start.SafeInvoke(() => btn_start.Enabled = enable);
-                btn_stop.SafeInvoke(() => btn_stop.Enabled = enable);
                 cb_commands.SafeInvoke(() => cb_commands.Enabled = enable);
                 btn_runCommand.SafeInvoke(() => btn_runCommand.Enabled = enable);
                 btn_stopCommand.SafeInvoke(() => btn_stopCommand.Enabled = !enable);
@@ -486,6 +545,7 @@ namespace SocialMediaDataScraper
                 UpdateUI(false);
                 var command = cb_commands.SelectedItem as string;
                 cb_commands.SelectedItem = QueryAction.NoAction;
+                isTaskRunning = true;
 
                 switch (command)
                 {
@@ -518,76 +578,15 @@ namespace SocialMediaDataScraper
                         break;
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-
+                ex.GetAllInnerMessages().ForEach(x => Log(DS_BrowserLogType.Error, x));
             }
             finally
             {
                 UpdateUI(true);
+                isTaskRunning = false;
             }
-        }
-
-
-        private void UC_Controller_Load(object sender, EventArgs e)
-        {
-            if (DesignMode) return;
-        }
-
-        private void btn_start_Click(object sender, EventArgs e)
-        {
-
-        }
-
-        private (DialogResult, T) ShowQueryDialog<T>() where T : class, new()
-        {
-            var model = Activator.CreateInstance<T>();
-            var result = new PropertyForm("Task Details", model).ShowDialog();
-            return (result, model);
-        }
-
-        private void SaveData<T1, T2>(InstaResult<T1> data) where T1 : class where T2 : class
-        {
-            if (data == null)
-            {
-                Log(DS_BrowserLogType.Error, "Collected data is null");
-                return;
-            }
-
-            if (!data.Status)
-            {
-                data.Errors?.ForEach(error => Log(DS_BrowserLogType.Error, error));
-                return;
-            }
-
-            var jsonData = JsonConvert.SerializeObject(data.Content, Formatting.Indented);
-            Log(DS_BrowserLogType.Info, $"Following data collected, Double click to view", content: jsonData);
-
-            var success = false;
-            if (data.Content is IList list)
-            {
-                var castedList = list.Cast<T2>().ToList();
-                success = DbHelper.SaveMany<T2>(castedList);
-            }
-            else if (data.Content is T1 obj)
-            {
-                var res = DbHelper.SaveOne(obj);
-                success = res != null;
-            }
-            else
-            {
-                Log(DS_BrowserLogType.Error, "Data content type is not supported");
-                return;
-            }
-
-            Log(success ? DS_BrowserLogType.Info : DS_BrowserLogType.Error, success ? "Following data saved" : "Unable to save following data");
-        }
-
-        private void CancelRunningTask(CancellationTokenSource cancellationToken)
-        {
-            var ans = MessageBox.Show("Do you want to cancel the task?", "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-            if (ans != DialogResult.Yes) return;
-            cancellationToken.Cancel();
         }
     }
 }

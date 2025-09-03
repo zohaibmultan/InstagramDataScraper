@@ -61,4 +61,24 @@ namespace SocialMediaDataScraper.Models
         public static string Error = "Error";
         public static string Exception = "Exception";
     }
+
+    public class DS_BrowserTask
+    {
+        [BsonId]
+        public ObjectId ID { get; set; }
+
+        public string QueryAction { get; set; }
+
+        public object QueryData { get; set; }
+
+        public string Type { get; set; }
+
+        public bool IsDone{ get; set; }
+
+        public DateTime? CreatedAt{ get; set; }
+
+        public DateTime? DoneAt{ get; set; }
+
+        public string DoneBy { get; set; }
+    }
 }
