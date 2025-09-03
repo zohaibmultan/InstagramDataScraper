@@ -61,9 +61,9 @@ namespace SocialMediaDataScraper
             var environment = await CoreWebView2Environment.CreateAsync(
                 browserExecutableFolder: null,
                 userDataFolder: Path.Combine(StaticInfo.UserSessionDirectory, dsBrowser.Username),
-                options: new CoreWebView2EnvironmentOptions()
+                options: new CoreWebView2EnvironmentOptions("--disable-web-security")
             );
-
+          
             await webView.EnsureCoreWebView2Async(environment);
             webView.ZoomFactor = 1;
             webView.CoreWebView2.Settings.UserAgent = dsBrowser.UserAgent;
@@ -114,6 +114,14 @@ namespace SocialMediaDataScraper
         {
             if (webView.CoreWebView2 == null || !webView.CoreWebView2.CanGoForward) return;
             webView.CoreWebView2.GoForward();
+        }
+
+        private void btn_store_Click(object sender, EventArgs e)
+        {
+            var url = tb_addressBar.Text.Trim();
+            if (string.IsNullOrEmpty(url)) return;
+
+            StaticInfo.CreateTasksFromUrl(url);
         }
     }
 }

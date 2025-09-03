@@ -1,12 +1,10 @@
 #nullable disable
 
 using LiteDB;
+using Newtonsoft.Json.Linq;
 using SocialMediaDataScraper.Common;
 using SocialMediaDataScraper.Models;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Reflection;
-using System.Threading.Tasks;
 
 namespace SocialMediaDataScraper
 {
@@ -15,6 +13,11 @@ namespace SocialMediaDataScraper
         BindingList<DS_Browser> accounts = [];
         BindingList<DS_BrowserTask> tasks = [];
         Dictionary<string, FormDsBrowser> forms = [];
+        System.Timers.Timer downloadTimer;
+        System.Timers.Timer downloadStatusTimer;
+        bool isDownloading = false;
+        static string downloadStatusText = string.Empty;
+        static decimal downloadStatusWait = 0;
 
         public MainForm()
         {
@@ -43,6 +46,77 @@ namespace SocialMediaDataScraper
             gv_tasks.AllowUserToDeleteRows = false;
             gv_tasks.AllowUserToResizeRows = false;
             gv_tasks.RowHeadersVisible = false;
+
+            tb_downlaodInterval.Minimum = 0;
+            tb_downlaodInterval.Maximum = int.MaxValue;
+        }
+
+        void LoadAppSetting()
+        {
+            StaticInfo.AppSetting = DbHelper.GetAll<AppSetting>().FirstOrDefault() ?? new AppSetting();
+
+            tb_ipAddress.Text = StaticInfo.AppSetting?.ApiUrl ?? string.Empty;
+            tb_downlaodInterval.Value = StaticInfo.AppSetting?.DownloadInterval ?? 0;
+
+            StartDownloadTimer();
+        }
+
+        void StartDownloadTimer()
+        {
+            System.Timers.ElapsedEventHandler downloadTimerHandler = (sender, e) =>
+            {
+                DownloadData();
+            };
+            System.Timers.ElapsedEventHandler downloadStatusTimerHandler = (sender, e) =>
+            {
+                if(!isDownloading && downloadStatusWait > 0)
+                {
+                    tb_downloadStatus.SetTextSafe($"Downloading will start in {downloadStatusWait} seconds");
+                    downloadStatusWait--;
+                }
+                else
+                {
+                    tb_downloadStatus.SetTextSafe(downloadStatusText);
+                }
+            };
+
+            if (tb_downlaodInterval.Value > 0)
+            {
+                if (downloadTimer != null && downloadTimer.Enabled)
+                {
+                    downloadTimer.Elapsed -= downloadTimerHandler;
+                    downloadTimer.Stop();
+                    downloadTimer.Dispose();
+                    downloadTimer.Enabled = false;
+                }
+
+                downloadTimer = new System.Timers.Timer((double)tb_downlaodInterval.Value * 1000);
+                downloadTimer.Elapsed += downloadTimerHandler;
+                downloadTimer.AutoReset = true;
+                downloadTimer.Enabled = true;
+
+                downloadStatusWait = tb_downlaodInterval.Value;
+            }
+            else
+            {
+                if (downloadTimer != null && downloadTimer.Enabled)
+                {
+                    downloadTimer.Elapsed -= downloadTimerHandler;
+                    downloadTimer.Stop();
+                    downloadTimer.Enabled = false;
+                }
+
+                downloadTimer?.Dispose();
+                downloadStatusWait = 0;
+            }
+
+            if (downloadStatusTimer == null)
+            {
+                downloadStatusTimer = new System.Timers.Timer(1000);
+                downloadStatusTimer.Elapsed += downloadStatusTimerHandler;
+                downloadStatusTimer.AutoReset = true;
+                downloadStatusTimer.Enabled = true;
+            }
         }
 
         void LoadAccountsGrid()
@@ -73,6 +147,41 @@ namespace SocialMediaDataScraper
             gv_tasks.Refresh();
 
             gv_tasks.Columns[nameof(DS_BrowserTask.QueryData)].Visible = false;
+        }
+
+        async void DownloadData()
+        {
+            try
+            {
+                if (isDownloading) return;
+
+                downloadStatusText = "Downloading started...";
+                isDownloading = true;
+
+                using var client = new HttpClient();
+                var request = new HttpRequestMessage(HttpMethod.Post, $"{StaticInfo.AppSetting?.ApiUrl}/api/PageDataCollector/GetPages");
+                var response = await client.SendAsync(request);
+                response.EnsureSuccessStatusCode();
+
+                var jsonString = await response.Content.ReadAsStringAsync();
+                if (string.IsNullOrEmpty(jsonString)) return;
+
+                var root = JObject.Parse(jsonString)?.ToObject<GetPagesModel>();
+                if (root == null) return;
+
+                var list = root.Data.Where(x => x.Url.StartsWith("https://www.instagram.com") && !x.IsDeleted).ToList();
+
+                downloadStatusText = "Downloading completed";
+            }
+            catch (Exception)
+            {
+
+            }
+            finally
+            {
+                isDownloading = false;
+                tb_downlaodInterval.SafeInvoke(() => downloadStatusWait = tb_downlaodInterval.Value);
+            }
         }
 
         List<DS_Browser> GetSelectedAccounts()
@@ -163,12 +272,21 @@ namespace SocialMediaDataScraper
         {
             LoadAccountsGrid();
             LoadTasksGrid();
+            LoadAppSetting();
         }
 
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
         {
             var ans = MessageBox.Show("Do you want to close?", "Confirm!", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
             if (ans != DialogResult.Yes) e.Cancel = true;
+
+            downloadStatusTimer?.Dispose();
+
+            if (downloadTimer != null)
+            {
+                downloadTimer.Stop();
+                downloadTimer.Dispose();
+            }
 
             foreach (var form in forms)
             {
@@ -318,6 +436,19 @@ namespace SocialMediaDataScraper
             var form = new TaskForm(tasks.First());
             var res = form.ShowDialog();
             if (res == DialogResult.OK) gv_tasks.Refresh();
+        }
+
+        private void tb_ipAddress_TextChanged(object sender, EventArgs e)
+        {
+            StaticInfo.AppSetting.ApiUrl = tb_ipAddress.Text.Trim();
+            DbHelper.SaveOne(StaticInfo.AppSetting, x => x.ID == StaticInfo.AppSetting.ID);
+        }
+
+        private void tb_downlaodInterval_ValueChanged(object sender, EventArgs e)
+        {
+            StaticInfo.AppSetting.DownloadInterval = tb_downlaodInterval.Value;
+            DbHelper.SaveOne(StaticInfo.AppSetting, x => x.ID == StaticInfo.AppSetting.ID);
+            StartDownloadTimer();
         }
     }
 }

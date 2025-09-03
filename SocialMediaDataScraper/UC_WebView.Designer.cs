@@ -38,6 +38,7 @@
             tb_status = new TextBox();
             btn_back = new Button();
             btn_forward = new Button();
+            btn_store = new Button();
             ((System.ComponentModel.ISupportInitialize)webView).BeginInit();
             SuspendLayout();
             // 
@@ -150,12 +151,24 @@
             btn_forward.UseVisualStyleBackColor = true;
             btn_forward.Click += btn_forward_Click;
             // 
+            // btn_store
+            // 
+            btn_store.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
+            btn_store.Location = new Point(290, 37);
+            btn_store.Name = "btn_store";
+            btn_store.Size = new Size(35, 30);
+            btn_store.TabIndex = 5;
+            btn_store.Text = "S";
+            btn_store.UseVisualStyleBackColor = true;
+            btn_store.Click += btn_store_Click;
+            // 
             // UC_WebView
             // 
             AutoScaleDimensions = new SizeF(7F, 17F);
             AutoScaleMode = AutoScaleMode.Font;
             Controls.Add(tb_status);
             Controls.Add(btn_zoomIn);
+            Controls.Add(btn_store);
             Controls.Add(btn_zoomOut);
             Controls.Add(webView);
             Controls.Add(tb_addressBar);
@@ -185,5 +198,6 @@
         private TextBox tb_status;
         private Button btn_back;
         private Button btn_forward;
+        private Button btn_store;
     }
 }
