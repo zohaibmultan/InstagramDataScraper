@@ -31,14 +31,14 @@
             gv_browsers = new DataGridView();
             btn_add = new Button();
             btn_delete = new Button();
-            btn_startAll = new Button();
-            btn_stopAll = new Button();
             btn_start = new Button();
             btn_stop = new Button();
             btn_edit = new Button();
             tabControl1 = new TabControl();
             tabPage1 = new TabPage();
             tabPage2 = new TabPage();
+            btn_stopAll = new Button();
+            btn_startAll = new Button();
             btn_taskAdd = new Button();
             btn_taskDelete = new Button();
             gv_tasks = new DataGridView();
@@ -77,7 +77,7 @@
             gv_browsers.Name = "gv_browsers";
             gv_browsers.RowTemplate.DefaultCellStyle.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold, GraphicsUnit.Point, 0);
             gv_browsers.RowTemplate.DefaultCellStyle.Padding = new Padding(5, 0, 5, 0);
-            gv_browsers.Size = new Size(842, 365);
+            gv_browsers.Size = new Size(853, 365);
             gv_browsers.TabIndex = 0;
             gv_browsers.DoubleClick += gv_browsers_DoubleClick;
             // 
@@ -105,37 +105,11 @@
             btn_delete.UseVisualStyleBackColor = true;
             btn_delete.Click += btn_delete_Click;
             // 
-            // btn_startAll
-            // 
-            btn_startAll.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btn_startAll.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
-            btn_startAll.Location = new Point(679, 6);
-            btn_startAll.Margin = new Padding(2);
-            btn_startAll.Name = "btn_startAll";
-            btn_startAll.Size = new Size(82, 28);
-            btn_startAll.TabIndex = 1;
-            btn_startAll.Text = "Start All";
-            btn_startAll.UseVisualStyleBackColor = true;
-            btn_startAll.Click += btn_startAll_Click;
-            // 
-            // btn_stopAll
-            // 
-            btn_stopAll.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btn_stopAll.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
-            btn_stopAll.Location = new Point(765, 6);
-            btn_stopAll.Margin = new Padding(2);
-            btn_stopAll.Name = "btn_stopAll";
-            btn_stopAll.Size = new Size(82, 28);
-            btn_stopAll.TabIndex = 1;
-            btn_stopAll.Text = "Stop All";
-            btn_stopAll.UseVisualStyleBackColor = true;
-            btn_stopAll.Click += btn_stopAll_Click;
-            // 
             // btn_start
             // 
             btn_start.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btn_start.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
-            btn_start.Location = new Point(449, 6);
+            btn_start.Location = new Point(632, 5);
             btn_start.Margin = new Padding(2);
             btn_start.Name = "btn_start";
             btn_start.Size = new Size(111, 28);
@@ -148,7 +122,7 @@
             // 
             btn_stop.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btn_stop.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
-            btn_stop.Location = new Point(564, 6);
+            btn_stop.Location = new Point(747, 5);
             btn_stop.Margin = new Padding(2);
             btn_stop.Name = "btn_stop";
             btn_stop.Size = new Size(111, 28);
@@ -189,20 +163,20 @@
             tabPage1.Controls.Add(gv_browsers);
             tabPage1.Controls.Add(btn_stop);
             tabPage1.Controls.Add(btn_edit);
-            tabPage1.Controls.Add(btn_stopAll);
-            tabPage1.Controls.Add(btn_startAll);
             tabPage1.Controls.Add(btn_start);
             tabPage1.Font = new Font("Segoe UI", 9.75F, FontStyle.Regular, GraphicsUnit.Point, 0);
             tabPage1.Location = new Point(4, 26);
             tabPage1.Name = "tabPage1";
             tabPage1.Padding = new Padding(3);
-            tabPage1.Size = new Size(852, 408);
+            tabPage1.Size = new Size(863, 408);
             tabPage1.TabIndex = 0;
             tabPage1.Text = "Accounts";
             tabPage1.UseVisualStyleBackColor = true;
             // 
             // tabPage2
             // 
+            tabPage2.Controls.Add(btn_stopAll);
+            tabPage2.Controls.Add(btn_startAll);
             tabPage2.Controls.Add(btn_taskAdd);
             tabPage2.Controls.Add(btn_taskDelete);
             tabPage2.Controls.Add(gv_tasks);
@@ -217,6 +191,32 @@
             tabPage2.TabIndex = 1;
             tabPage2.Text = "Tasks";
             tabPage2.UseVisualStyleBackColor = true;
+            // 
+            // btn_stopAll
+            // 
+            btn_stopAll.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btn_stopAll.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
+            btn_stopAll.Location = new Point(776, 5);
+            btn_stopAll.Margin = new Padding(2);
+            btn_stopAll.Name = "btn_stopAll";
+            btn_stopAll.Size = new Size(82, 28);
+            btn_stopAll.TabIndex = 10;
+            btn_stopAll.Text = "Stop All";
+            btn_stopAll.UseVisualStyleBackColor = true;
+            btn_stopAll.Click += btn_stopAll_Click;
+            // 
+            // btn_startAll
+            // 
+            btn_startAll.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btn_startAll.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
+            btn_startAll.Location = new Point(690, 5);
+            btn_startAll.Margin = new Padding(2);
+            btn_startAll.Name = "btn_startAll";
+            btn_startAll.Size = new Size(82, 28);
+            btn_startAll.TabIndex = 11;
+            btn_startAll.Text = "Start All";
+            btn_startAll.UseVisualStyleBackColor = true;
+            btn_startAll.Click += btn_startAll_Click;
             // 
             // btn_taskAdd
             // 
@@ -259,10 +259,10 @@
             // 
             btn_taskStop.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btn_taskStop.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
-            btn_taskStop.Location = new Point(747, 5);
+            btn_taskStop.Location = new Point(587, 5);
             btn_taskStop.Margin = new Padding(2);
             btn_taskStop.Name = "btn_taskStop";
-            btn_taskStop.Size = new Size(111, 28);
+            btn_taskStop.Size = new Size(99, 28);
             btn_taskStop.TabIndex = 5;
             btn_taskStop.Text = "Stop Selected";
             btn_taskStop.UseVisualStyleBackColor = true;
@@ -284,7 +284,7 @@
             // 
             btn_taskReload.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btn_taskReload.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
-            btn_taskReload.Location = new Point(564, 5);
+            btn_taskReload.Location = new Point(414, 5);
             btn_taskReload.Margin = new Padding(2);
             btn_taskReload.Name = "btn_taskReload";
             btn_taskReload.Size = new Size(64, 28);
@@ -297,10 +297,10 @@
             // 
             btn_taskStart.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btn_taskStart.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
-            btn_taskStart.Location = new Point(632, 5);
+            btn_taskStart.Location = new Point(482, 5);
             btn_taskStart.Margin = new Padding(2);
             btn_taskStart.Name = "btn_taskStart";
-            btn_taskStart.Size = new Size(111, 28);
+            btn_taskStart.Size = new Size(101, 28);
             btn_taskStart.TabIndex = 9;
             btn_taskStart.Text = "Start Selected";
             btn_taskStart.UseVisualStyleBackColor = true;
@@ -313,7 +313,7 @@
             tabPage3.Controls.Add(tableLayoutPanel1);
             tabPage3.Location = new Point(4, 26);
             tabPage3.Name = "tabPage3";
-            tabPage3.Size = new Size(852, 408);
+            tabPage3.Size = new Size(863, 408);
             tabPage3.TabIndex = 2;
             tabPage3.Text = "Settings";
             tabPage3.UseVisualStyleBackColor = true;
@@ -480,8 +480,6 @@
         private DataGridView gv_browsers;
         private Button btn_add;
         private Button btn_delete;
-        private Button btn_startAll;
-        private Button btn_stopAll;
         private Button btn_start;
         private Button btn_stop;
         private Button btn_edit;
@@ -507,5 +505,7 @@
         private TabPage tabPage3;
         private Button btn_saveSettings;
         private Button btn_taskReload;
+        private Button btn_stopAll;
+        private Button btn_startAll;
     }
 }

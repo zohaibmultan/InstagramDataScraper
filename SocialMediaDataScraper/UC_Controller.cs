@@ -10,15 +10,17 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Security.Policy;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace SocialMediaDataScraper
 {
     public partial class UC_Controller : UserControl
     {
-        public bool isTaskRunning = false;
         public CancellationTokenSource cancellationToken;
 
         private BindingList<DS_BrowserLog> logs { get; set; } = [];
+        private List<DS_BrowserTask> taskList { get; set; } = [];
+
         private DS_Browser dsBrowser { get; set; }
         private WebView2 webView { get; set; }
         private InstaHelper instaHelper { get; set; }
@@ -42,6 +44,118 @@ namespace SocialMediaDataScraper
 
             _ = RecheckLoginStatus();
         }
+
+        public void SetTaskList(List<DS_BrowserTask> list)
+        {
+            taskList = list;
+        }
+
+        public async void StartTasks()
+        {
+            foreach (var task in taskList)
+            {
+                logs.Clear();
+                listBox.SafeInvoke(() => listBox.Refresh());
+
+                switch (task.QueryData)
+                {
+                    case QueryProfile query:
+                        await StartSingleTask(task.QueryAction, query);
+                        break;
+
+                    case QuerySinglePost query:
+                        await StartSingleTask(task.QueryAction, query);
+                        break;
+
+                    case QueryBulkPosts query:
+                        await StartSingleTask(task.QueryAction, query);
+                        break;
+
+                    case QueryFollowing query:
+                        await StartSingleTask(task.QueryAction, query);
+                        break;
+
+                    case QueryFollowingAjax query:
+                        await StartSingleTask(task.QueryAction, query);
+                        break;
+
+                    case QueryPostComments query:
+                        await StartSingleTask(task.QueryAction, query);
+                        break;
+                }
+
+                task.IsDone = true;
+                task.DoneAt = DateTime.Now;
+                task.DoneBy = dsBrowser.Username;
+                task.Logs = [.. logs.Select(x => x.Text)];
+
+                DbHelper.UpdateOne(task);
+            }
+        }
+
+        private async Task StartSingleTask<T>(string command, T query)
+        {
+            if (dsBrowser.IsTaskRunning || string.IsNullOrEmpty(command)) return;
+
+            void UpdateUI(bool enable)
+            {
+                cb_commands.SafeInvoke(() => cb_commands.Enabled = enable);
+                btn_runCommand.SafeInvoke(() => btn_runCommand.Enabled = enable);
+                btn_stopCommand.SafeInvoke(() => btn_stopCommand.Enabled = !enable);
+            }
+
+            try
+            {
+                UpdateUI(false);
+                dsBrowser.IsTaskRunning = true;
+
+                switch (command)
+                {
+                    case QueryAction.RecheckLoginStatus:
+                        await RecheckLoginStatus();
+                        break;
+
+                    case QueryAction.GetUserProfile:
+                        await GetUserProfile(query as QueryProfile);
+                        break;
+
+                    case QueryAction.GetSinglePost:
+                        await GetSinglePost(query as QuerySinglePost);
+                        break;
+
+                    case QueryAction.GetPostsByUser:
+                        await GetPostsByUser(query as QueryBulkPosts);
+                        break;
+
+                    case QueryAction.GetFollowings:
+                        await GetFollowings(query as QueryFollowing);
+                        break;
+
+                    case QueryAction.GetFollowingsAjax:
+                        await GetFollowingsAjax(query as QueryFollowingAjax);
+                        break;
+
+                    case QueryAction.GetPostComments:
+                        await GetPostComments(query as QueryPostComments);
+                        break;
+
+                    case QueryAction.MonitorFollowRequest:
+                        await MonitorFollowRequest();
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                ex.GetAllInnerMessages().ForEach(x => Log(DS_BrowserLogType.Error, x));
+            }
+            finally
+            {
+                UpdateUI(true);
+                cb_commands.SafeInvoke(() => cb_commands.SelectedItem = QueryAction.NoAction);
+                dsBrowser.IsTaskRunning = false;
+            }
+        }
+
 
         public long Log(string type, string message, long? logId = null, bool replace = false, string content = null)
         {
@@ -145,23 +259,28 @@ namespace SocialMediaDataScraper
             if (!res.Status)
             {
                 Log(DS_BrowserLogType.Error, "Failed", logId, true);
+                dsBrowser.IsLogin = false;
                 return;
             }
 
+            dsBrowser.IsLogin = true;
             Log(DS_BrowserLogType.Info, "OK", logId, true);
         }
 
-        private async Task GetUserProfile()
+        private async Task GetUserProfile(QueryProfile query = null)
         {
-            var query = new QueryProfile();
-            InstaResult<InstaProfile> data = null;
-
-            if (new PropertyForm("Task Details", query).ShowDialog() != DialogResult.OK) return;
-
             if (webView == null || webView.CoreWebView2 == null) return;
+
+            if (query == null)
+            {
+                var (res, newQuery) = ShowQueryDialog<QueryProfile>();
+                if (res != DialogResult.OK) return;
+                query = newQuery;
+            }
 
             Log(DS_BrowserLogType.Info, $"-------- GET PROFILE --------");
 
+            InstaResult<InstaProfile> data = null;
             if (!string.IsNullOrEmpty(query.Username))
             {
                 Log(DS_BrowserLogType.Info, $"Getting profile {query.Username}...");
@@ -193,17 +312,20 @@ namespace SocialMediaDataScraper
             Log(DS_BrowserLogType.Info, $"-------- GET PROFILE END --------");
         }
 
-        private async Task GetSinglePost()
+        private async Task GetSinglePost(QuerySinglePost query = null)
         {
-            var query = new QuerySinglePost();
-            InstaResult<InstaPostVr2> data = null;
-
-            if (new PropertyForm("Task Details", query).ShowDialog() != DialogResult.OK) return;
-
             if (webView == null || webView.CoreWebView2 == null) return;
+
+            if (query == null)
+            {
+                var (res, newQuery) = ShowQueryDialog<QuerySinglePost>();
+                if (res != DialogResult.OK) return;
+                query = newQuery;
+            }
 
             Log(DS_BrowserLogType.Info, $"-------- GET POST --------");
 
+            InstaResult<InstaPostVr2> data = null;
             if (!string.IsNullOrEmpty(query.PostShortCode))
             {
                 Log(DS_BrowserLogType.Info, $"Getting post {query.PostShortCode}...");
@@ -235,9 +357,17 @@ namespace SocialMediaDataScraper
             Log(DS_BrowserLogType.Info, $"-------- GET POST END --------");
         }
 
-        private async Task GetPostsByUser()
+        private async Task GetPostsByUser(QueryBulkPosts query = null)
         {
-            var query = new QueryBulkPosts();
+            if (webView == null || webView.CoreWebView2 == null) return;
+
+            if (query == null)
+            {
+                var (res, newQuery) = ShowQueryDialog<QueryBulkPosts>();
+                if (res != DialogResult.OK) return;
+                query = newQuery;
+            }
+
             InstaResult<List<InstaPost>> data = null;
             cancellationToken = new CancellationTokenSource();
 
@@ -247,10 +377,6 @@ namespace SocialMediaDataScraper
                 if (ans != DialogResult.Yes) return;
                 cancellationToken.Cancel();
             }
-
-            if (new PropertyForm("Task Details", query).ShowDialog() != DialogResult.OK) return;
-
-            if (webView == null || webView.CoreWebView2 == null) return;
 
             Log(DS_BrowserLogType.Info, $"-------- GET POSTS --------");
             btn_stopCommand.Click += TaskCancel;
@@ -321,12 +447,19 @@ namespace SocialMediaDataScraper
             Log(DS_BrowserLogType.Info, $"-------- GET POSTS END --------");
         }
 
-        private async Task GetFollowings()
+        private async Task GetFollowings(QueryFollowing query = null)
         {
+            if (webView == null || webView.CoreWebView2 == null) return;
+
+            if (query == null)
+            {
+                var (res, newQuery) = ShowQueryDialog<QueryFollowing>();
+                if (res != DialogResult.OK) return;
+                query = newQuery;
+            }
+
             cancellationToken = new CancellationTokenSource();
             EventHandler canellationEvent = (sender, e) => CancelRunningTask(cancellationToken);
-            var (res, query) = ShowQueryDialog<QueryFollowing>();
-            if (res != DialogResult.OK) return;
 
             Log(DS_BrowserLogType.Info, $"-------- GET FOLLOWINGS --------");
             btn_stopCommand.Click += canellationEvent;
@@ -382,12 +515,19 @@ namespace SocialMediaDataScraper
             Log(DS_BrowserLogType.Info, $"-------- GET FOLLOWINGS END --------");
         }
 
-        private async Task GetFollowingsAjax()
+        private async Task GetFollowingsAjax(QueryFollowingAjax query = null)
         {
+            if (webView == null || webView.CoreWebView2 == null) return;
+
+            if (query == null)
+            {
+                var (res, newQuery) = ShowQueryDialog<QueryFollowingAjax>();
+                if (res != DialogResult.OK) return;
+                query = newQuery;
+            }
+
             cancellationToken = new CancellationTokenSource();
             EventHandler canellationEvent = (sender, e) => CancelRunningTask(cancellationToken);
-            var (res, query) = ShowQueryDialog<QueryFollowingAjax>();
-            if (res != DialogResult.OK) return;
 
             Log(DS_BrowserLogType.Info, $"-------- GET FOLLOWINGS --------");
             btn_stopCommand.Click += canellationEvent;
@@ -418,12 +558,19 @@ namespace SocialMediaDataScraper
             Log(DS_BrowserLogType.Info, $"-------- GET FOLLOWINGS END --------");
         }
 
-        private async Task GetPostComments()
+        private async Task GetPostComments(QueryPostComments query = null)
         {
+            if (webView == null || webView.CoreWebView2 == null) return;
+
+            if (query == null)
+            {
+                var (res, newQuery) = ShowQueryDialog<QueryPostComments>();
+                if (res != DialogResult.OK) return;
+                query = newQuery;
+            }
+
             cancellationToken = new CancellationTokenSource();
             EventHandler canellationEvent = (sender, e) => CancelRunningTask(cancellationToken);
-            var (res, query) = ShowQueryDialog<QueryPostComments>();
-            if (res != DialogResult.OK) return;
 
             Log(DS_BrowserLogType.Info, $"-------- GET POST COMMENTS --------");
             btn_stopCommand.Click += canellationEvent;
@@ -563,7 +710,13 @@ namespace SocialMediaDataScraper
 
         private async void btn_runCommand_Click(object sender, EventArgs e)
         {
-            if (isTaskRunning) return;
+            var command = cb_commands.SelectedItem as string;
+            await StartSingleTask(command);
+        }
+
+        private async Task StartSingleTask(string command)
+        {
+            if (dsBrowser.IsTaskRunning || string.IsNullOrEmpty(command)) return;
 
             void UpdateUI(bool enable)
             {
@@ -575,9 +728,7 @@ namespace SocialMediaDataScraper
             try
             {
                 UpdateUI(false);
-                var command = cb_commands.SelectedItem as string;
-                cb_commands.SelectedItem = QueryAction.NoAction;
-                isTaskRunning = true;
+                dsBrowser.IsTaskRunning = true;
 
                 switch (command)
                 {
@@ -621,7 +772,8 @@ namespace SocialMediaDataScraper
             finally
             {
                 UpdateUI(true);
-                isTaskRunning = false;
+                cb_commands.SafeInvoke(() => cb_commands.SelectedItem = QueryAction.NoAction);
+                dsBrowser.IsTaskRunning = false;
             }
         }
     }

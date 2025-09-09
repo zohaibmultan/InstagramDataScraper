@@ -13,6 +13,7 @@ namespace SocialMediaDataScraper
         BindingList<DS_Browser> accounts = [];
         BindingList<DS_BrowserTask> tasks = [];
         Dictionary<string, FormDsBrowser> forms = [];
+
         System.Timers.Timer downloadTimer;
         System.Timers.Timer downloadStatusTimer;
         bool isDownloading = false;
@@ -233,6 +234,8 @@ namespace SocialMediaDataScraper
             gv_browsers.Refresh();
         }
 
+
+
         void StartBrowser(DS_Browser browser)
         {
             if (forms.ContainsKey(browser.Username))
@@ -241,12 +244,11 @@ namespace SocialMediaDataScraper
                 return;
             }
 
+            browser.PropertyChanged += (s, e) =>gv_browsers.SafeInvoke(() => gv_browsers.Refresh());
+
             var dsForm = new FormDsBrowser(browser);
-            dsForm.FormClosing += (s, e) =>
-            {
-                gv_browsers.SafeInvoke(() => gv_browsers.Refresh());
-                forms.Remove(browser.Username);
-            };
+            dsForm.FormClosing += (s, e) => forms.Remove(browser.Username);
+
 
             dsForm.Show();
             dsForm.Activate();
@@ -299,6 +301,8 @@ namespace SocialMediaDataScraper
             }
         }
 
+
+        #region Events Account Tab
         private void btn_add_Click(object sender, EventArgs e)
         {
             ShowAccountForm();
@@ -357,26 +361,9 @@ namespace SocialMediaDataScraper
             if (items.Count == 0) return;
             ShowAccountForm(items.First());
         }
+        #endregion
 
-        private void btn_startAll_Click(object sender, EventArgs e)
-        {
-            foreach (var item in accounts)
-            {
-                if (item.IsActive)
-                    StartBrowser(item);
-            }
-        }
-
-        private void btn_stopAll_Click(object sender, EventArgs e)
-        {
-            foreach (var item in accounts)
-            {
-                StopBrowser(item);
-            }
-        }
-
-
-
+        #region Events Tasks Tab
         private void btn_taskAdd_Click(object sender, EventArgs e)
         {
             var form = new TaskForm();
@@ -425,7 +412,7 @@ namespace SocialMediaDataScraper
 
         private void btn_taskStart_Click(object sender, EventArgs e)
         {
-            
+
         }
 
         private void btn_taskStop_Click(object sender, EventArgs e)
@@ -443,6 +430,34 @@ namespace SocialMediaDataScraper
             if (res == DialogResult.OK) gv_tasks.Refresh();
         }
 
+        private void btn_taskReload_Click(object sender, EventArgs e)
+        {
+            LoadTasksGrid();
+        }
+
+        private void btn_startAll_Click(object sender, EventArgs e)
+        {
+            if(forms.Count == 0) return;
+            
+            var ans = MessageBox.Show("Do you want to start all tasks?", "Confirm!", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (ans != DialogResult.Yes) return;
+
+            var mainList = DbHelper.GetAll<DS_BrowserTask>().Where(x => !x.IsDone).ToList();
+            var subLists = mainList.SplitInto(forms.Count, true);
+
+            forms.Zip(subLists, (form, tasks) => new { form, tasks }).ToList().ForEach(x => x.form.Value.SetTaskList(x.tasks));
+        }
+
+        private void btn_stopAll_Click(object sender, EventArgs e)
+        {
+            foreach (var form in forms)
+            {
+                form.Value.CancelRunningTask();
+            }
+        }
+        #endregion
+
+        #region Events Setting Tab
         private void btn_saveSettings_Click(object sender, EventArgs e)
         {
             StaticInfo.AppSetting.ApiUrl = tb_ipAddress.Text.Trim();
@@ -457,10 +472,6 @@ namespace SocialMediaDataScraper
 
             DbHelper.SaveOne(StaticInfo.AppSetting, x => x.ID == StaticInfo.AppSetting.ID);
         }
-
-        private void btn_taskReload_Click(object sender, EventArgs e)
-        {
-            LoadTasksGrid();
-        }
+        #endregion
     }
 }

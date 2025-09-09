@@ -10,6 +10,7 @@ namespace SocialMediaDataScraper
         UC_WebView uc_webView;
         UC_Controller uc_controller;
 
+
         public FormDsBrowser(DS_Browser browser)
         {
             InitializeComponent();
@@ -49,18 +50,31 @@ namespace SocialMediaDataScraper
             }
             else
             {
+  
                 uc_controller.Log(DS_BrowserLogType.Error, "Failed", logId, true);
             }
         }
 
-        private void FormDsBrowser_Shown(object sender, EventArgs e)
+        public void SetTaskList(List<DS_BrowserTask> taskList)
         {
-            InitializeUserControls();
+            uc_controller.SetTaskList(taskList);
+            uc_controller.StartTasks();
         }
 
         public void CancelRunningTask()
         {
             uc_controller?.cancellationToken?.Cancel();
+        }
+
+        private void FormDsBrowser_Shown(object sender, EventArgs e)
+        {
+            dsBrowser.IsRunning = true;
+            InitializeUserControls();
+        }
+
+        private void FormDsBrowser_FormClosed(object sender, FormClosedEventArgs e)
+        {
+            dsBrowser.IsRunning = false;
         }
     }
 }

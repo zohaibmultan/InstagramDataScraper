@@ -11,16 +11,21 @@ namespace SocialMediaDataScraper.Common
         /// <param name="action">The action to perform.</param>
         public static void SafeInvoke(this Control control, Action action)
         {
-            if (control == null || control.IsDisposed) return;
+            try
+            {
+                if (control == null || control.IsDisposed) return;
 
-            if (control.InvokeRequired)
-            {
-                control.Invoke(action);
+                if (control.InvokeRequired)
+                {
+                    control.Invoke(action);
+                }
+                else
+                {
+                    action();
+                }
             }
-            else
-            {
-                action();
-            }
+            catch (Exception)
+            {}
         }
 
         /// <summary>
@@ -31,6 +36,24 @@ namespace SocialMediaDataScraper.Common
         public static void SetTextSafe(this Control control, string text)
         {
             control.SafeInvoke(() => control.Text = text);
+        }
+    }
+
+    public static class ListExtensions
+    {
+        public static List<List<T>> SplitInto<T>(this List<T> source, int n, bool shuffle = false)
+        {
+            if (source == null) throw new ArgumentNullException(nameof(source));
+            if (n <= 0) throw new ArgumentException("Number of sublists must be greater than 0.", nameof(n));
+
+            var list = source;
+            if (shuffle)
+            {
+                list = list.OrderBy(_ => Random.Shared.Next()).ToList();
+            }
+
+            int chunkSize = (int)Math.Ceiling((double)list.Count / n);
+            return list.Chunk(chunkSize).Select(chunk => chunk.ToList()).ToList();
         }
     }
 }
