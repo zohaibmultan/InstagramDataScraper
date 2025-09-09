@@ -44,15 +44,27 @@
             gv_tasks = new DataGridView();
             btn_taskStop = new Button();
             btn_taskEdit = new Button();
+            btn_taskReload = new Button();
             btn_taskStart = new Button();
-            tb_downlaodInterval = new NumericUpDown();
-            tb_ipAddress = new TextBox();
+            tabPage3 = new TabPage();
+            btn_saveSettings = new Button();
             tb_downloadStatus = new TextBox();
+            tableLayoutPanel1 = new TableLayoutPanel();
+            label1 = new Label();
+            tb_downlaodInterval = new NumericUpDown();
+            label2 = new Label();
+            label3 = new Label();
+            label4 = new Label();
+            tb_ipAddress = new TextBox();
+            tb_instagrapiSession = new TextBox();
+            tb_instagrapiApiUrl = new TextBox();
             ((System.ComponentModel.ISupportInitialize)gv_browsers).BeginInit();
             tabControl1.SuspendLayout();
             tabPage1.SuspendLayout();
             tabPage2.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)gv_tasks).BeginInit();
+            tabPage3.SuspendLayout();
+            tableLayoutPanel1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)tb_downlaodInterval).BeginInit();
             SuspendLayout();
             // 
@@ -65,7 +77,7 @@
             gv_browsers.Name = "gv_browsers";
             gv_browsers.RowTemplate.DefaultCellStyle.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold, GraphicsUnit.Point, 0);
             gv_browsers.RowTemplate.DefaultCellStyle.Padding = new Padding(5, 0, 5, 0);
-            gv_browsers.Size = new Size(802, 342);
+            gv_browsers.Size = new Size(842, 365);
             gv_browsers.TabIndex = 0;
             gv_browsers.DoubleClick += gv_browsers_DoubleClick;
             // 
@@ -97,7 +109,7 @@
             // 
             btn_startAll.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btn_startAll.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
-            btn_startAll.Location = new Point(639, 5);
+            btn_startAll.Location = new Point(679, 6);
             btn_startAll.Margin = new Padding(2);
             btn_startAll.Name = "btn_startAll";
             btn_startAll.Size = new Size(82, 28);
@@ -110,7 +122,7 @@
             // 
             btn_stopAll.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btn_stopAll.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
-            btn_stopAll.Location = new Point(725, 5);
+            btn_stopAll.Location = new Point(765, 6);
             btn_stopAll.Margin = new Padding(2);
             btn_stopAll.Name = "btn_stopAll";
             btn_stopAll.Size = new Size(82, 28);
@@ -123,7 +135,7 @@
             // 
             btn_start.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btn_start.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
-            btn_start.Location = new Point(409, 5);
+            btn_start.Location = new Point(449, 6);
             btn_start.Margin = new Padding(2);
             btn_start.Name = "btn_start";
             btn_start.Size = new Size(111, 28);
@@ -136,7 +148,7 @@
             // 
             btn_stop.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btn_stop.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
-            btn_stop.Location = new Point(524, 5);
+            btn_stop.Location = new Point(564, 6);
             btn_stop.Margin = new Padding(2);
             btn_stop.Name = "btn_stop";
             btn_stop.Size = new Size(111, 28);
@@ -162,11 +174,12 @@
             tabControl1.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             tabControl1.Controls.Add(tabPage1);
             tabControl1.Controls.Add(tabPage2);
+            tabControl1.Controls.Add(tabPage3);
             tabControl1.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
             tabControl1.Location = new Point(12, 12);
             tabControl1.Name = "tabControl1";
             tabControl1.SelectedIndex = 0;
-            tabControl1.Size = new Size(820, 415);
+            tabControl1.Size = new Size(871, 438);
             tabControl1.TabIndex = 2;
             // 
             // tabPage1
@@ -183,7 +196,7 @@
             tabPage1.Location = new Point(4, 26);
             tabPage1.Name = "tabPage1";
             tabPage1.Padding = new Padding(3);
-            tabPage1.Size = new Size(812, 385);
+            tabPage1.Size = new Size(852, 408);
             tabPage1.TabIndex = 0;
             tabPage1.Text = "Accounts";
             tabPage1.UseVisualStyleBackColor = true;
@@ -195,11 +208,12 @@
             tabPage2.Controls.Add(gv_tasks);
             tabPage2.Controls.Add(btn_taskStop);
             tabPage2.Controls.Add(btn_taskEdit);
+            tabPage2.Controls.Add(btn_taskReload);
             tabPage2.Controls.Add(btn_taskStart);
             tabPage2.Location = new Point(4, 26);
             tabPage2.Name = "tabPage2";
             tabPage2.Padding = new Padding(3);
-            tabPage2.Size = new Size(729, 385);
+            tabPage2.Size = new Size(863, 408);
             tabPage2.TabIndex = 1;
             tabPage2.Text = "Tasks";
             tabPage2.UseVisualStyleBackColor = true;
@@ -237,7 +251,7 @@
             gv_tasks.Name = "gv_tasks";
             gv_tasks.RowTemplate.DefaultCellStyle.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold, GraphicsUnit.Point, 0);
             gv_tasks.RowTemplate.DefaultCellStyle.Padding = new Padding(5, 0, 5, 0);
-            gv_tasks.Size = new Size(786, 315);
+            gv_tasks.Size = new Size(853, 365);
             gv_tasks.TabIndex = 2;
             gv_tasks.DoubleClick += gv_tasks_DoubleClick;
             // 
@@ -245,7 +259,7 @@
             // 
             btn_taskStop.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btn_taskStop.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
-            btn_taskStop.Location = new Point(680, 6);
+            btn_taskStop.Location = new Point(747, 5);
             btn_taskStop.Margin = new Padding(2);
             btn_taskStop.Name = "btn_taskStop";
             btn_taskStop.Size = new Size(111, 28);
@@ -266,11 +280,24 @@
             btn_taskEdit.UseVisualStyleBackColor = true;
             btn_taskEdit.Click += btn_taskEdit_Click;
             // 
+            // btn_taskReload
+            // 
+            btn_taskReload.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btn_taskReload.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
+            btn_taskReload.Location = new Point(564, 5);
+            btn_taskReload.Margin = new Padding(2);
+            btn_taskReload.Name = "btn_taskReload";
+            btn_taskReload.Size = new Size(64, 28);
+            btn_taskReload.TabIndex = 9;
+            btn_taskReload.Text = "Reload";
+            btn_taskReload.UseVisualStyleBackColor = true;
+            btn_taskReload.Click += btn_taskReload_Click;
+            // 
             // btn_taskStart
             // 
             btn_taskStart.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btn_taskStart.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
-            btn_taskStart.Location = new Point(565, 6);
+            btn_taskStart.Location = new Point(632, 5);
             btn_taskStart.Margin = new Padding(2);
             btn_taskStart.Name = "btn_taskStart";
             btn_taskStart.Size = new Size(111, 28);
@@ -279,49 +306,156 @@
             btn_taskStart.UseVisualStyleBackColor = true;
             btn_taskStart.Click += btn_taskStart_Click;
             // 
-            // tb_downlaodInterval
+            // tabPage3
             // 
-            tb_downlaodInterval.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
-            tb_downlaodInterval.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
-            tb_downlaodInterval.Location = new Point(363, 433);
-            tb_downlaodInterval.Name = "tb_downlaodInterval";
-            tb_downlaodInterval.Size = new Size(108, 25);
-            tb_downlaodInterval.TabIndex = 11;
-            tb_downlaodInterval.TextAlign = HorizontalAlignment.Center;
-            tb_downlaodInterval.ValueChanged += tb_downlaodInterval_ValueChanged;
+            tabPage3.Controls.Add(btn_saveSettings);
+            tabPage3.Controls.Add(tb_downloadStatus);
+            tabPage3.Controls.Add(tableLayoutPanel1);
+            tabPage3.Location = new Point(4, 26);
+            tabPage3.Name = "tabPage3";
+            tabPage3.Size = new Size(852, 408);
+            tabPage3.TabIndex = 2;
+            tabPage3.Text = "Settings";
+            tabPage3.UseVisualStyleBackColor = true;
             // 
-            // tb_ipAddress
+            // btn_saveSettings
             // 
-            tb_ipAddress.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-            tb_ipAddress.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
-            tb_ipAddress.Location = new Point(12, 433);
-            tb_ipAddress.Name = "tb_ipAddress";
-            tb_ipAddress.Size = new Size(345, 25);
-            tb_ipAddress.TabIndex = 10;
-            tb_ipAddress.TabStop = false;
-            tb_ipAddress.TextChanged += tb_ipAddress_TextChanged;
+            btn_saveSettings.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btn_saveSettings.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
+            btn_saveSettings.Location = new Point(764, 76);
+            btn_saveSettings.Margin = new Padding(2);
+            btn_saveSettings.Name = "btn_saveSettings";
+            btn_saveSettings.Size = new Size(82, 28);
+            btn_saveSettings.TabIndex = 13;
+            btn_saveSettings.Text = "Save";
+            btn_saveSettings.UseVisualStyleBackColor = true;
+            btn_saveSettings.Click += btn_saveSettings_Click;
             // 
             // tb_downloadStatus
             // 
-            tb_downloadStatus.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
             tb_downloadStatus.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
-            tb_downloadStatus.Location = new Point(477, 433);
+            tb_downloadStatus.Location = new Point(3, 79);
             tb_downloadStatus.Name = "tb_downloadStatus";
             tb_downloadStatus.ReadOnly = true;
-            tb_downloadStatus.Size = new Size(351, 25);
+            tb_downloadStatus.Size = new Size(233, 25);
             tb_downloadStatus.TabIndex = 10;
             tb_downloadStatus.TabStop = false;
-            tb_downloadStatus.TextChanged += tb_ipAddress_TextChanged;
+            // 
+            // tableLayoutPanel1
+            // 
+            tableLayoutPanel1.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            tableLayoutPanel1.ColumnCount = 4;
+            tableLayoutPanel1.ColumnStyles.Add(new ColumnStyle());
+            tableLayoutPanel1.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            tableLayoutPanel1.ColumnStyles.Add(new ColumnStyle());
+            tableLayoutPanel1.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            tableLayoutPanel1.Controls.Add(label1, 0, 0);
+            tableLayoutPanel1.Controls.Add(tb_downlaodInterval, 3, 0);
+            tableLayoutPanel1.Controls.Add(label2, 0, 1);
+            tableLayoutPanel1.Controls.Add(label3, 2, 0);
+            tableLayoutPanel1.Controls.Add(label4, 2, 1);
+            tableLayoutPanel1.Controls.Add(tb_ipAddress, 1, 0);
+            tableLayoutPanel1.Controls.Add(tb_instagrapiSession, 1, 1);
+            tableLayoutPanel1.Controls.Add(tb_instagrapiApiUrl, 3, 1);
+            tableLayoutPanel1.Location = new Point(3, 3);
+            tableLayoutPanel1.Name = "tableLayoutPanel1";
+            tableLayoutPanel1.RowCount = 3;
+            tableLayoutPanel1.RowStyles.Add(new RowStyle());
+            tableLayoutPanel1.RowStyles.Add(new RowStyle());
+            tableLayoutPanel1.RowStyles.Add(new RowStyle(SizeType.Absolute, 20F));
+            tableLayoutPanel1.Size = new Size(846, 68);
+            tableLayoutPanel1.TabIndex = 12;
+            // 
+            // label1
+            // 
+            label1.Anchor = AnchorStyles.Right;
+            label1.AutoSize = true;
+            label1.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
+            label1.Location = new Point(23, 7);
+            label1.Name = "label1";
+            label1.Size = new Size(115, 17);
+            label1.TabIndex = 13;
+            label1.Text = "Download API Url";
+            // 
+            // tb_downlaodInterval
+            // 
+            tb_downlaodInterval.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+            tb_downlaodInterval.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
+            tb_downlaodInterval.Location = new Point(559, 3);
+            tb_downlaodInterval.Name = "tb_downlaodInterval";
+            tb_downlaodInterval.Size = new Size(284, 25);
+            tb_downlaodInterval.TabIndex = 11;
+            tb_downlaodInterval.TextAlign = HorizontalAlignment.Center;
+            // 
+            // label2
+            // 
+            label2.Anchor = AnchorStyles.Right;
+            label2.AutoSize = true;
+            label2.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
+            label2.Location = new Point(3, 38);
+            label2.Name = "label2";
+            label2.Size = new Size(135, 17);
+            label2.TabIndex = 13;
+            label2.Text = "Instagrapi Session ID";
+            // 
+            // label3
+            // 
+            label3.Anchor = AnchorStyles.Right;
+            label3.AutoSize = true;
+            label3.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
+            label3.Location = new Point(433, 7);
+            label3.Name = "label3";
+            label3.Size = new Size(120, 17);
+            label3.TabIndex = 13;
+            label3.Text = "Download Interval";
+            // 
+            // label4
+            // 
+            label4.Anchor = AnchorStyles.Right;
+            label4.AutoSize = true;
+            label4.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
+            label4.Location = new Point(438, 38);
+            label4.Name = "label4";
+            label4.Size = new Size(115, 17);
+            label4.TabIndex = 13;
+            label4.Text = "Instagrapi API Url";
+            // 
+            // tb_ipAddress
+            // 
+            tb_ipAddress.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+            tb_ipAddress.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
+            tb_ipAddress.Location = new Point(144, 3);
+            tb_ipAddress.Name = "tb_ipAddress";
+            tb_ipAddress.Size = new Size(283, 25);
+            tb_ipAddress.TabIndex = 10;
+            tb_ipAddress.TabStop = false;
+            // 
+            // tb_instagrapiSession
+            // 
+            tb_instagrapiSession.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+            tb_instagrapiSession.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
+            tb_instagrapiSession.Location = new Point(144, 34);
+            tb_instagrapiSession.Name = "tb_instagrapiSession";
+            tb_instagrapiSession.Size = new Size(283, 25);
+            tb_instagrapiSession.TabIndex = 10;
+            tb_instagrapiSession.TabStop = false;
+            // 
+            // tb_instagrapiApiUrl
+            // 
+            tb_instagrapiApiUrl.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+            tb_instagrapiApiUrl.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
+            tb_instagrapiApiUrl.Location = new Point(559, 34);
+            tb_instagrapiApiUrl.Name = "tb_instagrapiApiUrl";
+            tb_instagrapiApiUrl.Size = new Size(284, 25);
+            tb_instagrapiApiUrl.TabIndex = 10;
+            tb_instagrapiApiUrl.TabStop = false;
             // 
             // MainForm
             // 
             AutoScaleDimensions = new SizeF(7F, 17F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(844, 470);
-            Controls.Add(tb_downlaodInterval);
+            ClientSize = new Size(895, 462);
             Controls.Add(tabControl1);
-            Controls.Add(tb_downloadStatus);
-            Controls.Add(tb_ipAddress);
             Font = new Font("Segoe UI", 9.75F, FontStyle.Regular, GraphicsUnit.Point, 0);
             Name = "MainForm";
             StartPosition = FormStartPosition.CenterScreen;
@@ -333,9 +467,12 @@
             tabPage1.ResumeLayout(false);
             tabPage2.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)gv_tasks).EndInit();
+            tabPage3.ResumeLayout(false);
+            tabPage3.PerformLayout();
+            tableLayoutPanel1.ResumeLayout(false);
+            tableLayoutPanel1.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)tb_downlaodInterval).EndInit();
             ResumeLayout(false);
-            PerformLayout();
         }
 
         #endregion
@@ -360,5 +497,15 @@
         private TextBox tb_ipAddress;
         private NumericUpDown tb_downlaodInterval;
         private TextBox tb_downloadStatus;
+        private TableLayoutPanel tableLayoutPanel1;
+        private Label label1;
+        private Label label2;
+        private Label label3;
+        private Label label4;
+        private TextBox tb_instagrapiSession;
+        private TextBox tb_instagrapiApiUrl;
+        private TabPage tabPage3;
+        private Button btn_saveSettings;
+        private Button btn_taskReload;
     }
 }

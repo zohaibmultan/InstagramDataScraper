@@ -6,6 +6,10 @@ using Microsoft.Web.WebView2.WinForms;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
+using System.Collections.Generic;
+using System.Net;
+using System.Text;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace SocialMediaDataScraper.Models
 {
@@ -1080,6 +1084,93 @@ namespace SocialMediaDataScraper.Models
             {
                 taskParams.WebView.CoreWebView2.WebResourceRequested -= OnWebResourceRequested;
                 taskParams.WebView.CoreWebView2.WebResourceResponseReceived -= OnWebResourceResponseReceived;
+            }
+        }
+
+
+        public async Task<InstaResult<List<string>>> MonitorFollowRequest(InstaBulkTaskParams<List<string>> taskParams)
+        {
+            var requestFilter = "graphql/query";
+            var requestFilterValue = "xdt_api__v1__friendships__create__target_user_id";
+            var tcs = new TaskCompletionSource<InstaResult<List<string>>>();
+            var collection = new List<string>();    
+
+            bool IsValidRequest(CoreWebView2WebResourceRequest Request)
+            {
+                var check1 = Request.Uri.Contains(requestFilter);
+                var check2 = Request.Headers.Any(x => x.Key.Equals("X-Root-Field-Name", StringComparison.CurrentCultureIgnoreCase) && x.Value.Equals(requestFilterValue, StringComparison.CurrentCultureIgnoreCase));
+                var check3 = Request.Headers.Any(x => x.Key.Equals("x-fb-friendly-name", StringComparison.CurrentCultureIgnoreCase) && x.Value.Equals("usePolarisToggleFollowUserFollowMutation", StringComparison.CurrentCultureIgnoreCase));
+                return check1 && check2 && check3;
+            }
+
+            async void OnWebResourceRequested(object sender, CoreWebView2WebResourceRequestedEventArgs e)
+            {
+                if (!IsValidRequest(e.Request)) return;
+
+                using var reader = new StreamReader(e.Request.Content);
+                var postData = await reader.ReadToEndAsync();
+                var postDataDict = postData.Split('&').Select(x => x.Split('=')).ToDictionary(parts => parts[0], parts => parts[1]);
+                var decodedStr = WebUtility.UrlDecode(postDataDict["variables"]);
+                var jsonObject = JObject.Parse(decodedStr);
+                var user_id = jsonObject["target_user_id"]?.ToString();
+                if (string.IsNullOrEmpty(user_id)) return;
+
+                collection.Add(user_id);
+                SendTaskProgress(taskParams, user_id);
+            }
+
+            try
+            {
+                taskParams.WebView.CoreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
+                taskParams.WebView.CoreWebView2.WebResourceRequested += OnWebResourceRequested;
+
+                taskParams.CancellationToken.Token.Register(() => tcs.TrySetResult(new InstaResult<List<string>>()
+                {
+                    Status = false,
+                    Content = collection,
+                    Errors = ["Task canceled by user"]
+                }));
+
+                return await tcs.Task;
+            }
+            catch (Exception ex)
+            {
+                return new InstaResult<List<string>>
+                {
+                    Status = false,
+                    Content = collection,
+                    Errors = ex.GetAllInnerMessages(),
+                };
+            }
+            finally
+            {
+                taskParams.WebView.CoreWebView2.WebResourceRequested -= OnWebResourceRequested;
+            }
+        }
+
+        public async Task<string> GetUsernameByUserPk(string userPk)
+        {
+            using var client = new HttpClient();
+            client.DefaultRequestHeaders.Clear();
+            client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 10_3_3 like Mac OS X) AppleWebKit/603.3.8 (KHTML, like Gecko) Mobile/14G60 Instagram 12.0.0.16.90 (iPhone9,4; iOS 10_3_3; en_US; en-US; scale=2.61; gamut=wide; 1080x1920)");
+            client.DefaultRequestHeaders.Add("X-Requested-With", "XMLHttpRequest");
+
+            try
+            {
+                var response = await client.GetAsync($"https://i.instagram.com/api/v1/users/{userPk}/info/");
+                if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    return null;
+                }
+
+                var json = await response.Content.ReadAsStringAsync();
+                var doc = JObject.Parse(json);
+                var username = doc?["user"]?["username"].ToString();
+                return username;
+            }
+            catch (Exception)
+            {
+                return null;
             }
         }
     }

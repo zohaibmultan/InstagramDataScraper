@@ -6,7 +6,9 @@ using Newtonsoft.Json;
 using SocialMediaDataScraper.Common;
 using SocialMediaDataScraper.Models;
 using System.Collections;
+using System.Collections.Generic;
 using System.ComponentModel;
+using System.Security.Policy;
 using System.Threading;
 
 namespace SocialMediaDataScraper
@@ -41,7 +43,7 @@ namespace SocialMediaDataScraper
             _ = RecheckLoginStatus();
         }
 
-        public long Log(string type, string message, long? logId = null, bool replace = false, string? content = null)
+        public long Log(string type, string message, long? logId = null, bool replace = false, string content = null)
         {
             DS_BrowserLog GetNewLog()
             {
@@ -76,6 +78,7 @@ namespace SocialMediaDataScraper
                     var index = logs.IndexOf(log);
                     log.Text = $"{DateTime.Now:HH:mm:ss} - {type} - {log.Message}{message}";
                     log.Type = type;
+                    log.Content = content ?? log.Content;
                     logs.ResetItem(index);
                 }
 
@@ -450,6 +453,35 @@ namespace SocialMediaDataScraper
             Log(DS_BrowserLogType.Info, $"-------- GET POST COMMENTS END --------");
         }
 
+        private async Task MonitorFollowRequest()
+        {
+            cancellationToken = new CancellationTokenSource();
+            EventHandler canellationEvent = (sender, e) => CancelRunningTask(cancellationToken);
+            btn_stopCommand.Click += canellationEvent;
+
+            Log(DS_BrowserLogType.Info, $"-------- MONITORING STARTED --------");
+            await instaHelper.MonitorFollowRequest(new InstaBulkTaskParams<List<string>>()
+            {
+                WebView = webView,
+                CancellationToken = cancellationToken,
+                TaskProgress = async (s, e) =>
+                {
+                    var user_id = e.Message;
+                    var logId = Log(DS_BrowserLogType.Info, $"{user_id} captured...", content: $"{user_id}");
+
+                    await Task.Delay(new Random().Next(3, 10) * 1000);
+
+                    var username = await instaHelper.GetUsernameByUserPk(user_id);
+                    StaticInfo.CreateTasksFromUserId(user_id, username);
+                    Log(DS_BrowserLogType.Info, $"Task created {username}", logId, true, $"{user_id} - {username}");
+                },
+            });
+            Log(DS_BrowserLogType.Info, $"-------- MONITORING ENDED --------");
+
+            btn_stopCommand.Click -= canellationEvent;
+            cancellationToken.Dispose();
+        }
+
         private void BreakLoop(TimeSpan time)
         {
             var title = dsBrowser.Username + " - Loop Breaker - Close in ";
@@ -575,6 +607,10 @@ namespace SocialMediaDataScraper
 
                     case QueryAction.GetPostComments:
                         await GetPostComments();
+                        break;
+
+                    case QueryAction.MonitorFollowRequest:
+                        await MonitorFollowRequest();
                         break;
                 }
             }

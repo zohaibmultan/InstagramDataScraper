@@ -23,6 +23,9 @@ namespace SocialMediaDataScraper
         {
             InitializeComponent();
 
+            Width = (int)(Screen.PrimaryScreen.WorkingArea.Width * 0.9);
+            Height = (int)(Screen.PrimaryScreen.WorkingArea.Height * 0.9);
+
             gv_browsers.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             gv_browsers.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             gv_browsers.MultiSelect = true;
@@ -57,6 +60,8 @@ namespace SocialMediaDataScraper
 
             tb_ipAddress.Text = StaticInfo.AppSetting?.ApiUrl ?? string.Empty;
             tb_downlaodInterval.Value = StaticInfo.AppSetting?.DownloadInterval ?? 0;
+            tb_instagrapiSession.Text = StaticInfo.AppSetting?.InstagrapiSessionId ?? string.Empty;
+            tb_instagrapiApiUrl.Text = StaticInfo.AppSetting?.InstagrapiUrl ?? string.Empty;
 
             StartDownloadTimer();
         }
@@ -69,7 +74,7 @@ namespace SocialMediaDataScraper
             };
             System.Timers.ElapsedEventHandler downloadStatusTimerHandler = (sender, e) =>
             {
-                if(!isDownloading && downloadStatusWait > 0)
+                if (!isDownloading && downloadStatusWait > 0)
                 {
                     tb_downloadStatus.SetTextSafe($"Downloading will start in {downloadStatusWait} seconds");
                     downloadStatusWait--;
@@ -420,7 +425,7 @@ namespace SocialMediaDataScraper
 
         private void btn_taskStart_Click(object sender, EventArgs e)
         {
-
+            
         }
 
         private void btn_taskStop_Click(object sender, EventArgs e)
@@ -438,17 +443,24 @@ namespace SocialMediaDataScraper
             if (res == DialogResult.OK) gv_tasks.Refresh();
         }
 
-        private void tb_ipAddress_TextChanged(object sender, EventArgs e)
+        private void btn_saveSettings_Click(object sender, EventArgs e)
         {
             StaticInfo.AppSetting.ApiUrl = tb_ipAddress.Text.Trim();
+            StaticInfo.AppSetting.InstagrapiSessionId = tb_instagrapiSession.Text.Trim();
+            StaticInfo.AppSetting.InstagrapiUrl = tb_instagrapiApiUrl.Text.Trim();
+
+            if (StaticInfo.AppSetting.DownloadInterval != tb_downlaodInterval.Value)
+            {
+                StaticInfo.AppSetting.DownloadInterval = tb_downlaodInterval.Value;
+                StartDownloadTimer();
+            }
+
             DbHelper.SaveOne(StaticInfo.AppSetting, x => x.ID == StaticInfo.AppSetting.ID);
         }
 
-        private void tb_downlaodInterval_ValueChanged(object sender, EventArgs e)
+        private void btn_taskReload_Click(object sender, EventArgs e)
         {
-            StaticInfo.AppSetting.DownloadInterval = tb_downlaodInterval.Value;
-            DbHelper.SaveOne(StaticInfo.AppSetting, x => x.ID == StaticInfo.AppSetting.ID);
-            StartDownloadTimer();
+            LoadTasksGrid();
         }
     }
 }

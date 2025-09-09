@@ -46,6 +46,11 @@ namespace SocialMediaDataScraper.Models
         [RequireAtLeastOne(nameof(Username), ErrorMessage = "At least username or profile url must be provided.")]
         [Url(ErrorMessage = "Invalid URL")]
         public string ProfileUrl { get; set; }
+
+        [Browsable(false)]
+        [DisplayName("Profile User ID")]
+        [Description("Instagram profile user id")]
+        public string UserPk { get; set; }
     }
 
     public class QuerySinglePost
@@ -74,6 +79,11 @@ namespace SocialMediaDataScraper.Models
         [Url(ErrorMessage = "Enter a valid URL")]
         [RequireAtLeastOne(nameof(Username), ErrorMessage = "At least username or profile url must be provided.")]
         public string ProfileUrl { get; set; }
+
+        [Browsable(false)]
+        [DisplayName("Profile User ID")]
+        [Description("Instagram profile user id")]
+        public string UserPk { get; set; }
     }
 
     public class QueryFollowing : QueryBulk
@@ -120,6 +130,7 @@ namespace SocialMediaDataScraper.Models
         public const string GetPostComments = "Get Comments of Post";
         public const string GetFollowings = "Get Followings of User";
         public const string GetFollowingsAjax = "Get Followings of User (Ajax)";
+        public const string MonitorFollowRequest = "Monitor Follow Request";
 
 
         public static List<string> GetAllQueryActions()

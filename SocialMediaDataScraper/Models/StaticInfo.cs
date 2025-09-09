@@ -176,6 +176,104 @@ namespace SocialMediaDataScraper.Models
             };
             notifyIcon.ShowBalloonTip(1000);
         }
+
+        public static void CreateTasksFromUserId(string userPk, string username)
+        {
+            var taskCount = 0;
+
+            /*try
+            {
+                using var client = new HttpClient();
+                using var request = new HttpRequestMessage(HttpMethod.Post, $"{AppSetting.InstagrapiUrl}/user/username_from_id");
+                request.Headers.Add("Accept", "application/json");
+
+                var collection = new List<KeyValuePair<string, string>>();
+                collection.Add(new("sessionid", AppSetting.InstagrapiSessionId));
+                collection.Add(new("user_id", userPk));
+
+                var content = new FormUrlEncodedContent(collection);
+                request.Content = content;
+                var response = await client.SendAsync(request);
+                if (response != null)
+                {
+                    username = await response.Content.ReadAsStringAsync();
+                    username = username.Replace("\"", "");
+                }
+            }
+            catch (Exception)
+            {}*/
+
+            var exist1 = DbHelper.GetOne<DS_BrowserTask>(x => x.QueryAction == QueryAction.GetUserProfile && ((x.QueryData as QueryProfile).Username == username || (x.QueryData as QueryProfile).UserPk == userPk));
+            if (exist1 == null)
+            {
+                var task = new DS_BrowserTask()
+                {
+                    QueryAction = QueryAction.GetUserProfile,
+                    QueryData = new QueryProfile()
+                    {
+                        Username = username,
+                        UserPk = userPk
+                    },
+                    Type = new QueryProfile().GetType().Name,
+                    CreatedAt = DateTime.Now,
+                };
+                if (DbHelper.SaveOne(task) != null) taskCount++;
+            }
+
+            var exist2 = DbHelper.GetOne<DS_BrowserTask>(x => x.QueryAction == QueryAction.GetPostsByUser && ((x.QueryData as QueryBulkPosts).Username == username || (x.QueryData as QueryBulkPosts).UserPk == userPk));
+            if (exist2 == null)
+            {
+                var task = new DS_BrowserTask()
+                {
+                    QueryAction = QueryAction.GetPostsByUser,
+                    QueryData = new QueryBulkPosts()
+                    {
+                        Username = username,
+                        UserPk = userPk,
+                        MinWait = 5,
+                        MaxWait = 30,
+                        LoopBreak = 5,
+                        RecordsCount = 500,
+                    },
+                    Type = new QueryBulkPosts().GetType().Name,
+                    CreatedAt = DateTime.Now,
+                };
+                if (DbHelper.SaveOne(task) != null) taskCount++;
+            }
+
+            var exist3 = DbHelper.GetOne<DS_BrowserTask>(x => x.QueryAction == QueryAction.GetFollowingsAjax && ((x.QueryData as QueryFollowingAjax).Username == username || (x.QueryData as QueryFollowingAjax).UserPK.ToString() == userPk));
+            if (exist3 == null)
+            {
+                var task = new DS_BrowserTask()
+                {
+                    QueryAction = QueryAction.GetFollowingsAjax,
+                    QueryData = new QueryFollowingAjax()
+                    {
+                        Username = username,
+                        UserPK = long.Parse(userPk),
+                        MinWait = 5,
+                        MaxWait = 30,
+                        LoopBreak = 5,
+                        RecordsCount = 500,
+                    },
+                    Type = new QueryFollowingAjax().GetType().Name,
+                    CreatedAt = DateTime.Now,
+                };
+                if (DbHelper.SaveOne(task) != null) taskCount++;
+            }
+
+            var notifyIcon = new NotifyIcon()
+            {
+                Icon = SystemIcons.Information,
+                Visible = true,
+                BalloonTipTitle = "Success",
+                BalloonTipText = $"{taskCount} tasks created",
+                BalloonTipIcon = ToolTipIcon.Info,
+            };
+            notifyIcon.ShowBalloonTip(1000);
+
+            return;
+        }
     }
 
     public class AppSetting
@@ -187,5 +285,7 @@ namespace SocialMediaDataScraper.Models
         public decimal DownloadInterval { get; set; }
         public string Username { get; set; }
         public string Password { get; set; }
+        public string InstagrapiUrl { get; set; }
+        public string InstagrapiSessionId { get; set; }
     }
 }
