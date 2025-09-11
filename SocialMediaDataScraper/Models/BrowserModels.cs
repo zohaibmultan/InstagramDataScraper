@@ -8,12 +8,13 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.Design;
 using System.Drawing.Design;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace SocialMediaDataScraper.Models
 {
-    public class DS_Browser
+    public class DS_UserAccount
     {
         private bool _isActive = true;
         private bool _isRunning = false;
@@ -140,16 +141,33 @@ namespace SocialMediaDataScraper.Models
 
         public object QueryData { get; set; }
 
-        public string Type { get; set; }
+        public string QueryObjectType { get; set; }
 
-        public bool IsDone{ get; set; }
+        public string Status { get; set; }
 
-        public DateTime? CreatedAt{ get; set; }
+        public DateTime? CreatedAt { get; set; }
 
-        public DateTime? DoneAt{ get; set; }
+        public DateTime? DoneAt { get; set; }
 
         public string DoneBy { get; set; }
 
         public List<string> Logs { get; set; }
+    }
+
+    public static class DS_BrowserTask_Status
+    {
+        public const string Pending  = "Pending";
+        public const string Running  = "Running";
+        public const string Done  = "Done";
+        public const string Error  = "Error";
+
+        public static List<string> GetAllStatus()
+        {
+            return typeof(DS_BrowserTask_Status)
+            .GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy)
+            .Where(f => f.IsLiteral && !f.IsInitOnly)
+            .Select(f => f.GetRawConstantValue().ToString())
+            .ToList();
+        }
     }
 }

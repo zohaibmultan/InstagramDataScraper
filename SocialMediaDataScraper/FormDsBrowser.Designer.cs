@@ -51,8 +51,7 @@
             Font = new Font("Segoe UI", 9.75F, FontStyle.Regular, GraphicsUnit.Point, 0);
             Name = "FormDsBrowser";
             Text = "FormDsBrowser";
-            WindowState = FormWindowState.Maximized;
-            FormClosed += FormDsBrowser_FormClosed;
+          
             Shown += FormDsBrowser_Shown;
             ((System.ComponentModel.ISupportInitialize)splitContainer).EndInit();
             splitContainer.ResumeLayout(false);

@@ -100,7 +100,7 @@ namespace SocialMediaDataScraper.Models
                         {
                             Username = username,
                         },
-                        Type = new QueryProfile().GetType().Name,
+                        QueryObjectType = new QueryProfile().GetType().Name,
                         CreatedAt = DateTime.Now,
                     };
                     if (DbHelper.SaveOne(task) != null) taskCount++;
@@ -120,7 +120,7 @@ namespace SocialMediaDataScraper.Models
                             LoopBreak = 5,
                             RecordsCount = 500,
                         },
-                        Type = new QueryBulkPosts().GetType().Name,
+                        QueryObjectType = new QueryBulkPosts().GetType().Name,
                         CreatedAt = DateTime.Now,
                     };
                     if (DbHelper.SaveOne(task) != null) taskCount++;
@@ -140,7 +140,7 @@ namespace SocialMediaDataScraper.Models
                             LoopBreak = 5,
                             RecordsCount = 500,
                         },
-                        Type = new QueryFollowingAjax().GetType().Name,
+                        QueryObjectType = new QueryFollowingAjax().GetType().Name,
                         CreatedAt = DateTime.Now,
                     };
                     if (DbHelper.SaveOne(task) != null) taskCount++;
@@ -159,7 +159,7 @@ namespace SocialMediaDataScraper.Models
                         {
                             PostShortCode = shortcode,
                         },
-                        Type = new QuerySinglePost().GetType().Name,
+                        QueryObjectType = new QuerySinglePost().GetType().Name,
                         CreatedAt = DateTime.Now,
                     };
                     if (DbHelper.SaveOne(task) != null) taskCount++;
@@ -214,7 +214,7 @@ namespace SocialMediaDataScraper.Models
                         Username = username,
                         UserPk = userPk
                     },
-                    Type = new QueryProfile().GetType().Name,
+                    QueryObjectType = new QueryProfile().GetType().Name,
                     CreatedAt = DateTime.Now,
                 };
                 if (DbHelper.SaveOne(task) != null) taskCount++;
@@ -235,7 +235,7 @@ namespace SocialMediaDataScraper.Models
                         LoopBreak = 5,
                         RecordsCount = 500,
                     },
-                    Type = new QueryBulkPosts().GetType().Name,
+                    QueryObjectType = new QueryBulkPosts().GetType().Name,
                     CreatedAt = DateTime.Now,
                 };
                 if (DbHelper.SaveOne(task) != null) taskCount++;
@@ -256,7 +256,7 @@ namespace SocialMediaDataScraper.Models
                         LoopBreak = 5,
                         RecordsCount = 500,
                     },
-                    Type = new QueryFollowingAjax().GetType().Name,
+                    QueryObjectType = new QueryFollowingAjax().GetType().Name,
                     CreatedAt = DateTime.Now,
                 };
                 if (DbHelper.SaveOne(task) != null) taskCount++;

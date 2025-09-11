@@ -5,14 +5,15 @@ using Newtonsoft.Json.Linq;
 using SocialMediaDataScraper.Common;
 using SocialMediaDataScraper.Models;
 using System.ComponentModel;
+using System.Threading.Tasks;
 
 namespace SocialMediaDataScraper
 {
     public partial class MainForm : Form
     {
-        BindingList<DS_Browser> accounts = [];
-        BindingList<DS_BrowserTask> tasks = [];
-        Dictionary<string, FormDsBrowser> forms = [];
+        BindingList<DS_UserAccount> userAccounts = [];
+        BindingList<DS_BrowserTask> browserTasks = [];
+        Dictionary<string, FormDsBrowser> dsBrowsers = [];
 
         System.Timers.Timer downloadTimer;
         System.Timers.Timer downloadStatusTimer;
@@ -55,18 +56,39 @@ namespace SocialMediaDataScraper
             tb_downlaodInterval.Maximum = int.MaxValue;
         }
 
-        void LoadAppSetting()
+        private void MainForm_Shown(object sender, EventArgs e)
         {
-            StaticInfo.AppSetting = DbHelper.GetAll<AppSetting>().FirstOrDefault() ?? new AppSetting();
-
-            tb_ipAddress.Text = StaticInfo.AppSetting?.ApiUrl ?? string.Empty;
-            tb_downlaodInterval.Value = StaticInfo.AppSetting?.DownloadInterval ?? 0;
-            tb_instagrapiSession.Text = StaticInfo.AppSetting?.InstagrapiSessionId ?? string.Empty;
-            tb_instagrapiApiUrl.Text = StaticInfo.AppSetting?.InstagrapiUrl ?? string.Empty;
-
-            StartDownloadTimer();
+            Cursor = Cursors.WaitCursor;
+            LoadAppSetting();
+            LoadAccountsGrid();
+            LoadTasksGrid();
+            Cursor = Cursors.Default;
         }
 
+        private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            var ans = MessageBox.Show("Do you want to close?", "Confirm!", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (ans != DialogResult.Yes) e.Cancel = true;
+
+            if (downloadStatusTimer != null)
+            {
+                downloadStatusTimer.Stop();
+                downloadStatusTimer?.Dispose();
+            }
+
+            if (downloadTimer != null)
+            {
+                downloadTimer.Stop();
+                downloadTimer.Dispose();
+            }
+
+            foreach (var item in dsBrowsers)
+            {
+                _ = StopBrowser(item.Value);
+            }
+        }
+
+        #region Account Tab
         void StartDownloadTimer()
         {
             System.Timers.ElapsedEventHandler downloadTimerHandler = (sender, e) =>
@@ -125,36 +147,6 @@ namespace SocialMediaDataScraper
             }
         }
 
-        void LoadAccountsGrid()
-        {
-            gv_browsers.DataSource = accounts;
-            var data = DbHelper.GetAll<DS_Browser>();
-            accounts.Clear();
-
-            foreach (DS_Browser browser in data)
-            {
-                accounts.Add(browser);
-            }
-
-            gv_browsers.Refresh();
-        }
-
-        void LoadTasksGrid()
-        {
-            tasks.Clear();
-            var data = DbHelper.GetAll<DS_BrowserTask>().OrderByDescending(x => x.CreatedAt);
-
-            foreach (DS_BrowserTask task in data)
-            {
-                tasks.Add(task);
-            }
-
-            gv_tasks.DataSource = tasks;
-            gv_tasks.Refresh();
-
-            gv_tasks.Columns[nameof(DS_BrowserTask.QueryData)].Visible = false;
-        }
-
         async void DownloadData()
         {
             try
@@ -190,34 +182,71 @@ namespace SocialMediaDataScraper
             }
         }
 
-        List<DS_Browser> GetSelectedAccounts()
+        void StartBrowser(DS_UserAccount userAccount)
         {
-            var list = new List<DS_Browser>();
-            if (gv_browsers.SelectedRows.Count == 0) return list;
+            if (dsBrowsers.TryGetValue(userAccount.Username, out FormDsBrowser value))
+            {
+                value.Activate();
+                return;
+            }
 
-            foreach (DataGridViewRow item in gv_browsers.SelectedRows)
-                list.Add(item.DataBoundItem as DS_Browser);
+            userAccount.PropertyChanged += (s, e) => gv_browsers.SafeInvoke(() => gv_browsers.Refresh());
 
-            return list.Where(x => x != null).ToList();
+            var dsForm = new FormDsBrowser(userAccount);
+            dsForm.FormClosing += OnFormClosing;
+            dsForm.Show();
+            dsForm.Activate();
+
+            dsBrowsers.Add(userAccount.Username, dsForm);
+            gv_browsers.Refresh();
+
+            void OnFormClosing(object sender, FormClosingEventArgs e)
+            {
+                if (!dsForm.forceClose)
+                {
+                    var ans = MessageBox.Show("Do you want to close this browser?", "Confirm!", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                    if (ans == DialogResult.No)
+                    {
+                        e.Cancel = true;
+                        return;
+                    }
+                }
+
+                dsForm.FormClosing -= OnFormClosing;
+                _ = StopBrowser(dsForm);
+            }
         }
 
-        List<DS_BrowserTask> GetSelectedTasks()
+        async Task StopBrowser(FormDsBrowser dsBrowser, bool forceStop = false)
         {
-            var list = new List<DS_BrowserTask>();
-            if (gv_tasks.SelectedRows.Count == 0) return list;
-
-            foreach (DataGridViewRow item in gv_tasks.SelectedRows)
-                list.Add(item.DataBoundItem as DS_BrowserTask);
-
-            return list.Where(x => x != null).ToList();
+            dsBrowser.uc_controller.cancellationToken?.Cancel();
+            while (dsBrowser.userAccount.IsTaskRunning == true) await Task.Delay(1000);
+            dsBrowser.userAccount.IsRunning = false;
+            dsBrowser.Close();
+            dsBrowsers.Remove(dsBrowser.userAccount.Username);
+            gv_browsers.Refresh();
         }
 
-        void ShowAccountForm(DS_Browser model = null)
+        void LoadAccountsGrid()
+        {
+            gv_browsers.DataSource = userAccounts;
+            var data = DbHelper.GetAll<DS_UserAccount>();
+            userAccounts.Clear();
+
+            foreach (DS_UserAccount browser in data)
+            {
+                userAccounts.Add(browser);
+            }
+
+            gv_browsers.Refresh();
+        }
+
+        void ShowAccountForm(DS_UserAccount model = null)
         {
             var isNew = model == null;
             if (isNew)
             {
-                model = new DS_Browser
+                model = new DS_UserAccount
                 {
                     ID = ObjectId.NewObjectId(),
                     UserAgent = StaticInfo.DefaultUserAgent,
@@ -230,79 +259,21 @@ namespace SocialMediaDataScraper
 
             var dbModel = DbHelper.SaveOne(model, x => x.ID == model.ID);
             if (dbModel == null) return;
-            if (isNew) accounts.Add(dbModel);
+            if (isNew) userAccounts.Add(dbModel);
             gv_browsers.Refresh();
         }
 
-
-
-        void StartBrowser(DS_Browser browser)
+        List<DS_UserAccount> GetSelectedAccounts()
         {
-            if (forms.ContainsKey(browser.Username))
-            {
-                forms[browser.Username].Activate();
-                return;
-            }
+            var list = new List<DS_UserAccount>();
+            if (gv_browsers.SelectedRows.Count == 0) return list;
 
-            browser.PropertyChanged += (s, e) =>gv_browsers.SafeInvoke(() => gv_browsers.Refresh());
+            foreach (DataGridViewRow item in gv_browsers.SelectedRows)
+                list.Add(item.DataBoundItem as DS_UserAccount);
 
-            var dsForm = new FormDsBrowser(browser);
-            dsForm.FormClosing += (s, e) => forms.Remove(browser.Username);
-
-
-            dsForm.Show();
-            dsForm.Activate();
-
-            forms.Add(browser.Username, dsForm);
-            gv_browsers.Refresh();
+            return list.Where(x => x != null).ToList();
         }
 
-        void StopBrowser(DS_Browser browser)
-        {
-            if (!forms.ContainsKey(browser.Username)) return;
-            if (browser.IsRunning)
-            {
-                var ans = MessageBox.Show("Browser task is running. Do you want to close?", "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                if (ans != DialogResult.Yes) return;
-            }
-
-            forms[browser.Username].Close();
-            forms.Remove(browser.Username);
-
-            browser.IsRunning = false;
-            gv_browsers.Refresh();
-        }
-
-
-
-        private void MainForm_Shown(object sender, EventArgs e)
-        {
-            LoadAccountsGrid();
-            LoadTasksGrid();
-            LoadAppSetting();
-        }
-
-        private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
-        {
-            var ans = MessageBox.Show("Do you want to close?", "Confirm!", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-            if (ans != DialogResult.Yes) e.Cancel = true;
-
-            downloadStatusTimer?.Dispose();
-
-            if (downloadTimer != null)
-            {
-                downloadTimer.Stop();
-                downloadTimer.Dispose();
-            }
-
-            foreach (var form in forms)
-            {
-                form.Value.CancelRunningTask();
-            }
-        }
-
-
-        #region Events Account Tab
         private void btn_add_Click(object sender, EventArgs e)
         {
             ShowAccountForm();
@@ -317,17 +288,22 @@ namespace SocialMediaDataScraper
 
         private void btn_delete_Click(object sender, EventArgs e)
         {
-            var items = GetSelectedAccounts();
-            if (items.Count == 0) return;
+            var accounts = GetSelectedAccounts();
+            if (accounts.Count == 0) return;
 
-            var ans = MessageBox.Show($"Do you want to delete {items.Count} records?", "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            var ans = MessageBox.Show($"Do you want to delete {accounts.Count} records?", "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
             if (ans != DialogResult.Yes) return;
 
-            items.ForEach(item =>
+            accounts.ForEach(account =>
             {
-                if (DbHelper.Delete<DS_Browser>(item.ID))
+                if (dsBrowsers.TryGetValue(account.Username, out var dsBrowser))
                 {
-                    accounts.Remove(item);
+                    _ = StopBrowser(dsBrowser);
+                }
+
+                if (DbHelper.Delete<DS_UserAccount>(account.ID))
+                {
+                    userAccounts.Remove(account);
                 }
             });
 
@@ -346,11 +322,15 @@ namespace SocialMediaDataScraper
             var items = GetSelectedAccounts();
             if (items.Count == 0) return;
 
+            var ans = MessageBox.Show($"Do you want to close {items.Count} browsers?", "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (ans != DialogResult.Yes) return;
+
             items.ForEach(x =>
             {
-                if (forms.ContainsKey(x.Username))
+                if (dsBrowsers.TryGetValue(x.Username, out FormDsBrowser dsBrowser))
                 {
-                    StopBrowser(x);
+                    dsBrowser.forceClose = true;
+                    _ = StopBrowser(dsBrowser);
                 }
             });
         }
@@ -363,14 +343,80 @@ namespace SocialMediaDataScraper
         }
         #endregion
 
-        #region Events Tasks Tab
+        #region Tasks Tab
+        private void LoadTasksGrid()
+        {
+            browserTasks.Clear();
+            var data = DbHelper.GetAll<DS_BrowserTask>().OrderByDescending(x => x.CreatedAt);
+
+            foreach (DS_BrowserTask task in data)
+            {
+                browserTasks.Add(task);
+            }
+
+            gv_tasks.DataSource = browserTasks;
+            gv_tasks.Refresh();
+
+            gv_tasks.Columns[nameof(DS_BrowserTask.QueryData)].Visible = false;
+        }
+
+        private List<DS_BrowserTask> GetSelectedTasks()
+        {
+            var list = new List<DS_BrowserTask>();
+            if (gv_tasks.SelectedRows.Count == 0) return list;
+
+            foreach (DataGridViewRow item in gv_tasks.SelectedRows)
+                list.Add(item.DataBoundItem as DS_BrowserTask);
+
+            return list.Where(x => x != null).ToList();
+        }
+
+        private async void StartBulkTask(List<DS_BrowserTask> taskList)
+        {
+            if (taskList.Count == 0)
+            {
+                MessageBox.Show("Task list is emply.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            if (dsBrowsers.Count == 0)
+            {
+                MessageBox.Show("Browsers are not running. Start at least one browser", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            var ans = MessageBox.Show($"Do you want to start {taskList.Count} tasks?", "Confirm!", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (ans != DialogResult.Yes) return;
+
+            btn_taskDelete.Enabled = false;
+            btn_taskStart.Enabled = false;
+            btn_taskStop.Enabled = false;
+            btn_startAll.Enabled = false;
+            btn_taskStop.Enabled = true;
+
+            var subLists = taskList.SplitInto(dsBrowsers.Count, true);
+            var zipLists = dsBrowsers.Zip(subLists, (dsBrowser, tasks) => new { dsBrowser, tasks }).ToList();
+            foreach (var zip in zipLists)
+            {
+                await zip.dsBrowser.Value.uc_controller.StartTasks(zip.tasks);
+            }
+
+            btn_taskDelete.Enabled = true;
+            btn_taskStart.Enabled = true;
+            btn_taskStop.Enabled = true;
+            btn_startAll.Enabled = true;
+            btn_taskStop.Enabled = true;
+
+            LoadTasksGrid();
+        }
+
         private void btn_taskAdd_Click(object sender, EventArgs e)
         {
             var form = new TaskForm();
             var res = form.ShowDialog();
             if (res == DialogResult.OK)
             {
-                tasks.Add(form.GetSelectedTask());
+                browserTasks.Add(form.GetSelectedTask());
                 gv_tasks.Refresh();
             }
         }
@@ -403,7 +449,7 @@ namespace SocialMediaDataScraper
             {
                 if (DbHelper.Delete<DS_BrowserTask>(row.ID))
                 {
-                    tasks.Remove(row);
+                    browserTasks.Remove(row);
                 }
             }
 
@@ -412,7 +458,8 @@ namespace SocialMediaDataScraper
 
         private void btn_taskStart_Click(object sender, EventArgs e)
         {
-
+            var dsTasks = GetSelectedTasks();
+            StartBulkTask(dsTasks);
         }
 
         private void btn_taskStop_Click(object sender, EventArgs e)
@@ -437,27 +484,46 @@ namespace SocialMediaDataScraper
 
         private void btn_startAll_Click(object sender, EventArgs e)
         {
-            if(forms.Count == 0) return;
-            
-            var ans = MessageBox.Show("Do you want to start all tasks?", "Confirm!", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-            if (ans != DialogResult.Yes) return;
+            var dsTasks = browserTasks
+                .Where(x => x.Status == DS_BrowserTask_Status.Pending)
+                .ToList();
 
-            var mainList = DbHelper.GetAll<DS_BrowserTask>().Where(x => !x.IsDone).ToList();
-            var subLists = mainList.SplitInto(forms.Count, true);
-
-            forms.Zip(subLists, (form, tasks) => new { form, tasks }).ToList().ForEach(x => x.form.Value.SetTaskList(x.tasks));
+            StartBulkTask(dsTasks);
         }
 
         private void btn_stopAll_Click(object sender, EventArgs e)
         {
-            foreach (var form in forms)
+            var ans = MessageBox.Show("Do you want to cancel the task?", "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (ans != DialogResult.Yes) return;
+
+            btn_stopAll.Enabled = false;
+
+            foreach (var item in dsBrowsers)
             {
-                form.Value.CancelRunningTask();
+                _ = item.Value.uc_controller.StopTasks();
             }
+
+            btn_taskDelete.Enabled = true;
+            btn_taskStart.Enabled = true;
+            btn_taskStop.Enabled = true;
+            btn_startAll.Enabled = true;
+            btn_stopAll.Enabled = true;
         }
         #endregion
 
-        #region Events Setting Tab
+        #region Setting Tab
+        void LoadAppSetting()
+        {
+            StaticInfo.AppSetting = DbHelper.GetAll<AppSetting>().FirstOrDefault() ?? new AppSetting();
+
+            tb_ipAddress.Text = StaticInfo.AppSetting?.ApiUrl ?? string.Empty;
+            tb_downlaodInterval.Value = StaticInfo.AppSetting?.DownloadInterval ?? 0;
+            tb_instagrapiSession.Text = StaticInfo.AppSetting?.InstagrapiSessionId ?? string.Empty;
+            tb_instagrapiApiUrl.Text = StaticInfo.AppSetting?.InstagrapiUrl ?? string.Empty;
+
+            StartDownloadTimer();
+        }
+
         private void btn_saveSettings_Click(object sender, EventArgs e)
         {
             StaticInfo.AppSetting.ApiUrl = tb_ipAddress.Text.Trim();

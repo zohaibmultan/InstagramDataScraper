@@ -6,75 +6,50 @@ namespace SocialMediaDataScraper
 {
     public partial class FormDsBrowser : Form
     {
-        DS_Browser dsBrowser;
-        UC_WebView uc_webView;
-        UC_Controller uc_controller;
+        public DS_UserAccount userAccount;
+        public UC_WebView uc_webView;
+        public UC_Controller uc_controller;
+        public bool forceClose;
 
-
-        public FormDsBrowser(DS_Browser browser)
+        public FormDsBrowser(DS_UserAccount account)
         {
             InitializeComponent();
-            dsBrowser = browser;
-            Text = browser.Username + " | " + browser.Email;
-
-            uc_webView = new UC_WebView()
+            Height = (int)(Screen.PrimaryScreen.WorkingArea.Height * 0.98);
+            userAccount = account;
+            uc_webView = new UC_WebView(account)
             {
                 Dock = DockStyle.Fill,
             };
-            uc_controller = new UC_Controller()
+            uc_controller = new UC_Controller(account, uc_webView.WebView)
             {
                 Dock = DockStyle.Fill
             };
 
             splitContainer.Panel1.Controls.Add(uc_webView);
             splitContainer.Panel2.Controls.Add(uc_controller);
+
+            Text = account.Username + " | " + account.Email;
         }
 
-        private async void InitializeUserControls()
+        private async void Initialize()
         {
             var logId = uc_controller.Log(DS_BrowserLogType.Info, "Browser instance initizlizing...");
-
-            await uc_webView.SetBrowserData(dsBrowser);
-            var token = new CancellationTokenSource(TimeSpan.FromSeconds(60));
-
-            while (!token.IsCancellationRequested && !uc_webView.IsWebViewReady)
+            var (status, errors) = await uc_webView.Initialize();
+            if (!status)
             {
-                uc_controller.Log(DS_BrowserLogType.Info, "...", logId, true);
-                await Task.Delay(5000);
+                uc_controller.Log(DS_BrowserLogType.Error, "Browser instance initizlizing failed", logId, true, string.Join("\n", errors));
+                return;
             }
 
-            if (uc_webView.IsWebViewReady)
-            {
-                uc_controller.Log(DS_BrowserLogType.Info, "OK", logId, true);
-                uc_controller.SetBrowserData(dsBrowser, uc_webView.WebView);
-            }
-            else
-            {
-  
-                uc_controller.Log(DS_BrowserLogType.Error, "Failed", logId, true);
-            }
+            uc_controller.Log(DS_BrowserLogType.Info, "OK", logId, true);
+            uc_controller.Initialize();
         }
 
-        public void SetTaskList(List<DS_BrowserTask> taskList)
-        {
-            uc_controller.SetTaskList(taskList);
-            uc_controller.StartTasks();
-        }
-
-        public void CancelRunningTask()
-        {
-            uc_controller?.cancellationToken?.Cancel();
-        }
-
+        #region Events
         private void FormDsBrowser_Shown(object sender, EventArgs e)
         {
-            dsBrowser.IsRunning = true;
-            InitializeUserControls();
+            Initialize();
         }
-
-        private void FormDsBrowser_FormClosed(object sender, FormClosedEventArgs e)
-        {
-            dsBrowser.IsRunning = false;
-        }
+        #endregion
     }
 }

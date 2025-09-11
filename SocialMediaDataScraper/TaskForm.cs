@@ -4,12 +4,13 @@ using SocialMediaDataScraper.Common;
 using SocialMediaDataScraper.Models;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
+using System.Windows.Forms;
 
 namespace SocialMediaDataScraper
 {
     public partial class TaskForm : Form
     {
-        private DS_BrowserTask selectedTask{ get; set; }
+        private DS_BrowserTask selectedTask { get; set; }
 
         public TaskForm(DS_BrowserTask task = null)
         {
@@ -17,6 +18,15 @@ namespace SocialMediaDataScraper
             selectedTask = task;
             cb_commands.DataSource = new BindingList<string>(QueryAction.GetAllQueryActions());
             cb_commands.SelectedItem = QueryAction.NoAction;
+
+            cb_status.DataSource = new BindingList<string>(DS_BrowserTask_Status.GetAllStatus());
+            cb_commands.SelectedItem = DS_BrowserTask_Status.Pending;
+
+            var accounts = DbHelper.GetAll<DS_UserAccount>().Select(x => x.Username).ToList();
+            accounts.Insert(0, "");
+            cb_doneBy.DataSource = new BindingList<string>(accounts);
+            cb_doneBy.SelectedItem = "";
+
             LoadUI();
         }
 
@@ -29,6 +39,10 @@ namespace SocialMediaDataScraper
         {
             Text = selectedTask == null ? "Add New Task" : "Edit Task";
             cb_commands.SelectedItem = selectedTask?.QueryAction ?? QueryAction.NoAction;
+            cb_status.SelectedItem = selectedTask?.Status;
+            cb_doneBy.SelectedItem = selectedTask?.DoneBy;
+            tb_DoneAt.Text = selectedTask?.DoneAt?.ToString("dd-MMM-yyyy hh:mm:ss tt");
+            tb_logs.Text = selectedTask?.Logs == null ? "" : string.Join("\n", selectedTask?.Logs);
             propertyGrid.SelectedObject = selectedTask?.QueryData;
             propertyGrid.Refresh();
         }
@@ -75,7 +89,7 @@ namespace SocialMediaDataScraper
             }
         }
 
-        private void btn_run_Click(object sender, EventArgs e)
+        private void btn_save_Click(object sender, EventArgs e)
         {
             var (status, errors) = ValidateObject(propertyGrid.SelectedObject);
             if (!status)
@@ -89,9 +103,10 @@ namespace SocialMediaDataScraper
             {
                 selectedTask = new DS_BrowserTask()
                 {
+                    QueryObjectType = propertyGrid.SelectedObject.GetType().Name,
                     QueryAction = cb_commands.SelectedItem as string,
+                    Status = DS_BrowserTask_Status.Pending,
                     QueryData = propertyGrid.SelectedObject,
-                    Type = propertyGrid.SelectedObject.GetType().Name,
                     CreatedAt = DateTime.Now,
                 };
 
@@ -99,9 +114,11 @@ namespace SocialMediaDataScraper
             }
             else
             {
+                selectedTask.QueryObjectType = propertyGrid.SelectedObject.GetType().Name;
                 selectedTask.QueryAction = cb_commands.SelectedItem as string;
+                selectedTask.Status = cb_status.SelectedItem as string;
+                selectedTask.DoneBy = cb_doneBy.SelectedItem as string;
                 selectedTask.QueryData = propertyGrid.SelectedObject;
-                selectedTask.Type = propertyGrid.SelectedObject.GetType().Name;
                 selectedTask.CreatedAt ??= DateTime.Now;
                 DbHelper.UpdateOne(selectedTask);
             }
@@ -150,6 +167,11 @@ namespace SocialMediaDataScraper
             }
 
             propertyGrid.Refresh();
+        }
+
+        private void btn_taskResult_Click(object sender, EventArgs e)
+        {
+
         }
     }
 }

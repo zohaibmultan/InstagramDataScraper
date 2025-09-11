@@ -1208,6 +1208,10 @@ namespace SocialMediaDataScraper.Models
     {
         [BsonId]
         public ObjectId _id { get; set; }
+
+        [BsonRef(nameof(DS_BrowserTask))]
+        public DS_BrowserTask task { get;set;}
+
         public string id { get; set; }
         public string username { get; set; }
         public string profile_pic_url { get; set; }

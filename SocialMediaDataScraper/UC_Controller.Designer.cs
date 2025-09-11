@@ -54,7 +54,6 @@
             listBox.Name = "listBox";
             listBox.Size = new Size(536, 346);
             listBox.TabIndex = 4;
-
             listBox.DoubleClick += listBox_DoubleClick;
             // 
             // cb_commands
@@ -91,6 +90,7 @@
             btn_stopCommand.TabIndex = 3;
             btn_stopCommand.Text = "Stop Action";
             btn_stopCommand.UseVisualStyleBackColor = true;
+
             // 
             // UC_Controller
             // 
