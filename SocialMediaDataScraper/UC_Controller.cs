@@ -11,6 +11,8 @@ using System.ComponentModel;
 using System.Security.Policy;
 using System.Threading;
 using System.Threading.Tasks;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement.StartPanel;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement.TrackBar;
 
 namespace SocialMediaDataScraper
 {
@@ -38,6 +40,18 @@ namespace SocialMediaDataScraper
             listBox.ValueMember = nameof(DS_BrowserLog.ID);
 
             cb_commands.DataSource = new BindingList<string>(QueryAction.GetAllQueryActions());
+
+            gv_tasks.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            gv_tasks.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            gv_tasks.MultiSelect = false;
+            gv_tasks.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.EnableResizing;
+            gv_tasks.ColumnHeadersHeight = 30;
+            gv_tasks.RowTemplate.Height = 30;
+            gv_tasks.ReadOnly = true;
+            gv_tasks.AllowUserToAddRows = false;
+            gv_tasks.AllowUserToDeleteRows = false;
+            gv_tasks.AllowUserToResizeRows = false;
+            gv_tasks.RowHeadersVisible = false;
         }
 
         public long Log(string type, string message, long? logId = null, bool replace = false, string content = null)
@@ -144,9 +158,15 @@ namespace SocialMediaDataScraper
         {
             if (cancellationToken != null)
             {
-                cancellationToken.Dispose();
+                cancellationToken?.Dispose();
                 cancellationToken = null;
             }
+
+            gv_tasks.DataSource = taskList;
+            gv_tasks.Columns[nameof(DS_BrowserTask.QueryData)].Visible = false;
+            gv_tasks.Columns[nameof(DS_BrowserTask.QueryObjectType)].Visible = false;
+            gv_tasks.Columns[nameof(DS_BrowserTask.DoneBy)].Visible = false;
+            gv_tasks.Refresh();
 
             foreach (var task in taskList)
             {
@@ -155,7 +175,7 @@ namespace SocialMediaDataScraper
                 logs.Clear();
                 listBox.SafeInvoke(() => listBox.Refresh());
 
-                var result = await StartSingleTask(task.QueryAction, task.QueryData);
+                var result = await StartSingleTask(task.QueryAction, task.QueryData, task.ID);
 
                 task.Status = result ? DS_BrowserTask_Status.Done : DS_BrowserTask_Status.Error;
                 task.DoneAt = DateTime.Now;
@@ -165,16 +185,19 @@ namespace SocialMediaDataScraper
                 DbHelper.UpdateOne(task);
 
                 if (cancellationToken?.IsCancellationRequested == true) break;
+
+                gv_tasks.Refresh();
+                await Task.Delay(new Random().Next(3, 10));
             }
         }
 
         public async Task StopTasks()
         {
-            cancellationToken.Cancel();
+            cancellationToken?.Cancel();
             await Task.Delay(1000);
         }
 
-        private async Task<bool> StartSingleTask<T>(string command, T query = null) where T : class
+        private async Task<bool> StartSingleTask<T>(string command, T query = null, ObjectId taskID = null) where T : class
         {
             if (userAccount.IsTaskRunning || string.IsNullOrEmpty(command)) return false;
 
@@ -197,27 +220,27 @@ namespace SocialMediaDataScraper
                         break;
 
                     case QueryAction.GetUserProfile:
-                        await GetUserProfile(query as QueryProfile);
+                        await GetUserProfile(query as QueryProfile, taskID);
                         break;
 
                     case QueryAction.GetSinglePost:
-                        await GetSinglePost(query as QuerySinglePost);
+                        await GetSinglePost(query as QuerySinglePost, taskID);
                         break;
 
                     case QueryAction.GetPostsByUser:
-                        await GetPostsByUser(query as QueryBulkPosts);
+                        await GetPostsByUser(query as QueryBulkPosts, taskID);
                         break;
 
                     case QueryAction.GetFollowings:
-                        await GetFollowings(query as QueryFollowing);
+                        await GetFollowings(query as QueryFollowing, taskID);
                         break;
 
                     case QueryAction.GetFollowingsAjax:
-                        await GetFollowingsAjax(query as QueryFollowingAjax);
+                        await GetFollowingsAjax(query as QueryFollowingAjax, taskID);
                         break;
 
                     case QueryAction.GetPostComments:
-                        await GetPostComments(query as QueryPostComments);
+                        await GetPostComments(query as QueryPostComments, taskID);
                         break;
 
                     case QueryAction.MonitorFollowRequest:
@@ -301,7 +324,7 @@ namespace SocialMediaDataScraper
             Log(DS_BrowserLogType.Info, "OK", logId, true);
         }
 
-        private async Task GetUserProfile(QueryProfile query = null)
+        private async Task GetUserProfile(QueryProfile query = null, ObjectId taskId = null)
         {
             if (webView == null || webView.CoreWebView2 == null) return;
 
@@ -331,7 +354,9 @@ namespace SocialMediaDataScraper
                 var jsonData = JsonConvert.SerializeObject(data.Content, Formatting.Indented);
                 Log(DS_BrowserLogType.Info, $"Profile data collected, Double click to view", content: jsonData);
 
-                var model = DbHelper.SaveOne<InstaProfile>(data.Content);
+                if (taskId != null) data.Content.taskId = taskId;
+                var model = DbHelper.SaveOne(data.Content);
+
                 Log(model != null ? DS_BrowserLogType.Info : DS_BrowserLogType.Error, model != null ? "Profile data saved" : "Unable to save profile data");
             }
             else if (data != null && !data.Status)
@@ -346,7 +371,7 @@ namespace SocialMediaDataScraper
             Log(DS_BrowserLogType.Info, $"-------- GET PROFILE END --------");
         }
 
-        private async Task GetSinglePost(QuerySinglePost query = null)
+        private async Task GetSinglePost(QuerySinglePost query = null, ObjectId taskId = null)
         {
             if (webView == null || webView.CoreWebView2 == null) return;
 
@@ -376,7 +401,9 @@ namespace SocialMediaDataScraper
                 var jsonData = JsonConvert.SerializeObject(data.Content, Formatting.Indented);
                 Log(DS_BrowserLogType.Info, $"Post data collected, Double click to view", content: jsonData);
 
-                var model = DbHelper.SaveOne<InstaPostVr2>(data.Content);
+                if (taskId != null) data.Content.taskId = taskId;
+                var model = DbHelper.SaveOne(data.Content);
+
                 Log(model != null ? DS_BrowserLogType.Info : DS_BrowserLogType.Error, model != null ? "Post data saved" : "Unable to save post data");
             }
             else if (data != null && !data.Status)
@@ -391,7 +418,7 @@ namespace SocialMediaDataScraper
             Log(DS_BrowserLogType.Info, $"-------- GET POST END --------");
         }
 
-        private async Task GetPostsByUser(QueryBulkPosts query = null)
+        private async Task GetPostsByUser(QueryBulkPosts query = null, ObjectId taskId = null)
         {
             if (webView == null || webView.CoreWebView2 == null) return;
 
@@ -465,7 +492,9 @@ namespace SocialMediaDataScraper
                 var jsonData = JsonConvert.SerializeObject(data.Content, Formatting.Indented);
                 Log(DS_BrowserLogType.Info, $"Posts data collected, Double click to view", content: jsonData);
 
-                var ans = DbHelper.SaveMany<InstaPost>(data.Content);
+                if (taskId != null) data.Content.ForEach(x => x.taskId = taskId);
+                var ans = DbHelper.SaveMany(data.Content);
+
                 Log(ans ? DS_BrowserLogType.Info : DS_BrowserLogType.Error, ans ? "Posts data saved" : "Unable to save posts data");
             }
             else if (data != null && !data.Status)
@@ -481,7 +510,7 @@ namespace SocialMediaDataScraper
             Log(DS_BrowserLogType.Info, $"-------- GET POSTS END --------");
         }
 
-        private async Task GetFollowings(QueryFollowing query = null)
+        private async Task GetFollowings(QueryFollowing query = null, ObjectId taskId = null)
         {
             if (webView == null || webView.CoreWebView2 == null) return;
 
@@ -493,7 +522,7 @@ namespace SocialMediaDataScraper
             }
 
             cancellationToken = new CancellationTokenSource();
-            EventHandler canellationEvent = (sender, e) => StopTasks();
+            EventHandler canellationEvent = (sender, e) => _ = StopTasks();
 
             Log(DS_BrowserLogType.Info, $"-------- GET FOLLOWINGS --------");
             btn_stopCommand.Click += canellationEvent;
@@ -519,6 +548,8 @@ namespace SocialMediaDataScraper
                         FailedAttempts = 3,
                     }
                 );
+
+                if (taskId != null) data.Content.ForEach(x => x.taskId = taskId);
                 SaveTaskData<List<InstaFollowing>, InstaFollowing>(data);
             }
             else if (!string.IsNullOrEmpty(query.ProfileUrl))
@@ -542,6 +573,8 @@ namespace SocialMediaDataScraper
                         FailedAttempts = 3,
                     }
                 );
+
+                if (taskId != null) data.Content.ForEach(x => x.taskId = taskId);
                 SaveTaskData<List<InstaFollowing>, InstaFollowing>(data);
             }
 
@@ -549,7 +582,7 @@ namespace SocialMediaDataScraper
             Log(DS_BrowserLogType.Info, $"-------- GET FOLLOWINGS END --------");
         }
 
-        private async Task GetFollowingsAjax(QueryFollowingAjax query = null)
+        private async Task GetFollowingsAjax(QueryFollowingAjax query = null, ObjectId taskId = null)
         {
             if (webView == null || webView.CoreWebView2 == null) return;
 
@@ -561,10 +594,16 @@ namespace SocialMediaDataScraper
             }
 
             cancellationToken = new CancellationTokenSource();
-            EventHandler canellationEvent = (sender, e) => StopTasks();
+            EventHandler canellationEvent = (sender, e) => _ = StopTasks();
 
             Log(DS_BrowserLogType.Info, $"-------- GET FOLLOWINGS --------");
             btn_stopCommand.Click += canellationEvent;
+
+            query.Username = await instaHelper.GetUsernameByUserPk(query.UserPK.ToString());
+            if (!string.IsNullOrEmpty(query.Username))
+            {
+                webView.Source = new Uri($"https://www.instagram.com/{query.Username}");
+            }
 
             Log(DS_BrowserLogType.Info, $"Getting followings {query.Username}...");
             var data = await instaHelper.GetFollowingsAjax(
@@ -586,13 +625,15 @@ namespace SocialMediaDataScraper
                     FailedAttempts = 3,
                 }
             );
+
+            if (taskId != null) data.Content.ForEach(x => x.taskId = taskId);
             SaveTaskData<List<InstaFollowing>, InstaFollowing>(data);
 
             btn_stopCommand.Click -= canellationEvent;
             Log(DS_BrowserLogType.Info, $"-------- GET FOLLOWINGS END --------");
         }
 
-        private async Task GetPostComments(QueryPostComments query = null)
+        private async Task GetPostComments(QueryPostComments query = null, ObjectId taskId = null)
         {
             if (webView == null || webView.CoreWebView2 == null) return;
 
@@ -628,6 +669,8 @@ namespace SocialMediaDataScraper
                     FailedAttempts = 3,
                 }
             );
+
+            if (taskId != null) data.Content.ForEach(x => x.taskId = taskId);
             SaveTaskData<List<InstaComment>, InstaComment>(data);
 
             btn_stopCommand.Click -= canellationEvent;
@@ -678,7 +721,7 @@ namespace SocialMediaDataScraper
             var textBox = new RichTextBox()
             {
                 Dock = DockStyle.Fill,
-                Font = listBox.Font,
+                Font = new Font("Consolas", 11.25F, FontStyle.Regular, GraphicsUnit.Point, 0),
                 Text = item.Content,
                 ReadOnly = true,
             };
@@ -696,6 +739,21 @@ namespace SocialMediaDataScraper
         {
             var command = cb_commands.SelectedItem as string;
             await StartSingleTask<DS_BrowserTask>(command);
+        }
+
+        private void btn_stopCommand_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void gv_tasks_DoubleClick(object sender, EventArgs e)
+        {
+            if (gv_tasks.SelectedRows.Count == 0) return;
+
+            var task = gv_tasks.SelectedRows[0].DataBoundItem as DS_BrowserTask;
+            var form = new TaskForm(task);
+            var res = form.ShowDialog();
+            if (res == DialogResult.OK) gv_tasks.Refresh();
         }
         #endregion
     }

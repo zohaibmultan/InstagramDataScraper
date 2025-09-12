@@ -1,9 +1,12 @@
 ﻿#nullable disable
 
+using LiteDB;
+using Newtonsoft.Json;
 using SocialMediaDataScraper.Common;
 using SocialMediaDataScraper.Models;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace SocialMediaDataScraper
@@ -44,6 +47,7 @@ namespace SocialMediaDataScraper
             tb_DoneAt.Text = selectedTask?.DoneAt?.ToString("dd-MMM-yyyy hh:mm:ss tt");
             tb_logs.Text = selectedTask?.Logs == null ? "" : string.Join("\n", selectedTask?.Logs);
             propertyGrid.SelectedObject = selectedTask?.QueryData;
+            btn_taskResult.Enabled = selectedTask != null;
             propertyGrid.Refresh();
         }
 
@@ -62,6 +66,30 @@ namespace SocialMediaDataScraper
             }
 
             return (true, null);
+        }
+
+        private void ShowTaskResult(object data)
+        {
+            if (selectedTask == null) return;
+
+            var jsonStr = JsonConvert.SerializeObject(data, Formatting.Indented);
+            if (string.IsNullOrEmpty(jsonStr)) return;
+
+            var textBox = new RichTextBox()
+            {
+                Dock = DockStyle.Fill,
+                Font = new Font("Consolas", 11.25F, FontStyle.Regular, GraphicsUnit.Point, 0),
+                Text = jsonStr,
+                ReadOnly = true,
+            };
+
+            var form = new Form();
+            form.Controls.Add(textBox);
+            form.StartPosition = FormStartPosition.CenterParent;
+            form.Width = (int)(Screen.PrimaryScreen.Bounds.Width * 0.8);
+            form.Height = (int)(Screen.PrimaryScreen.Bounds.Height * 0.7);
+            form.Text = selectedTask?.ID.ToString();
+            form.ShowDialog();
         }
 
         private void btn_cancel_Click(object sender, EventArgs e)
@@ -171,7 +199,43 @@ namespace SocialMediaDataScraper
 
         private void btn_taskResult_Click(object sender, EventArgs e)
         {
+            if (selectedTask == null)
+            {
+                return;
+            }
 
+            switch (selectedTask.QueryAction)
+            {
+                case QueryAction.GetUserProfile:
+                    var profile = DbHelper.GetOne<InstaProfile>(x => x.taskId == selectedTask.ID);
+                    ShowTaskResult(profile);
+                    break;
+
+                case QueryAction.GetSinglePost:
+                    var post = DbHelper.GetOne<InstaPostVr2>(x => x.taskId == selectedTask.ID);
+                    ShowTaskResult(post);
+                    break;
+
+                case QueryAction.GetPostsByUser:
+                    var posts = DbHelper.Get<InstaPost>(x => x.taskId == selectedTask.ID);
+                    ShowTaskResult(posts);
+                    break;
+
+                case QueryAction.GetFollowings:
+                    var followings = DbHelper.Get<InstaFollowing>(x => x.taskId == selectedTask.ID);
+                    ShowTaskResult(followings);
+                    break;
+
+                case QueryAction.GetFollowingsAjax:
+                    var followingAjax = DbHelper.Get<InstaFollowing>(x => x.taskId == selectedTask.ID);
+                    ShowTaskResult(followingAjax);
+                    break;
+
+                case QueryAction.GetPostComments:
+                    var comments = DbHelper.Get<InstaComment>(x => x.taskId == selectedTask.ID);
+                    ShowTaskResult(comments);
+                    break;
+            }
         }
     }
 }

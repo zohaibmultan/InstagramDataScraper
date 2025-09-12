@@ -37,12 +37,19 @@
             tabControl1 = new TabControl();
             tabPage1 = new TabPage();
             tabPage2 = new TabPage();
+            tableLayoutPanel2 = new TableLayoutPanel();
+            btn_taskSearch = new Button();
+            label6 = new Label();
+            filter_account = new CheckedListBox();
+            label7 = new Label();
+            label5 = new Label();
+            filter_status = new CheckedListBox();
+            filter_query = new CheckedListBox();
             btn_stopAll = new Button();
             btn_startAll = new Button();
             btn_taskAdd = new Button();
             btn_taskDelete = new Button();
             gv_tasks = new DataGridView();
-            btn_taskStop = new Button();
             btn_taskEdit = new Button();
             btn_taskReload = new Button();
             btn_taskStart = new Button();
@@ -62,6 +69,7 @@
             tabControl1.SuspendLayout();
             tabPage1.SuspendLayout();
             tabPage2.SuspendLayout();
+            tableLayoutPanel2.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)gv_tasks).BeginInit();
             tabPage3.SuspendLayout();
             tableLayoutPanel1.SuspendLayout();
@@ -77,7 +85,7 @@
             gv_browsers.Name = "gv_browsers";
             gv_browsers.RowTemplate.DefaultCellStyle.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold, GraphicsUnit.Point, 0);
             gv_browsers.RowTemplate.DefaultCellStyle.Padding = new Padding(5, 0, 5, 0);
-            gv_browsers.Size = new Size(853, 365);
+            gv_browsers.Size = new Size(1041, 401);
             gv_browsers.TabIndex = 0;
             gv_browsers.DoubleClick += gv_browsers_DoubleClick;
             // 
@@ -109,7 +117,7 @@
             // 
             btn_start.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btn_start.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
-            btn_start.Location = new Point(632, 5);
+            btn_start.Location = new Point(820, 5);
             btn_start.Margin = new Padding(2);
             btn_start.Name = "btn_start";
             btn_start.Size = new Size(111, 28);
@@ -122,7 +130,7 @@
             // 
             btn_stop.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btn_stop.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
-            btn_stop.Location = new Point(747, 5);
+            btn_stop.Location = new Point(935, 5);
             btn_stop.Margin = new Padding(2);
             btn_stop.Name = "btn_stop";
             btn_stop.Size = new Size(111, 28);
@@ -153,7 +161,7 @@
             tabControl1.Location = new Point(12, 12);
             tabControl1.Name = "tabControl1";
             tabControl1.SelectedIndex = 0;
-            tabControl1.Size = new Size(871, 438);
+            tabControl1.Size = new Size(1059, 474);
             tabControl1.TabIndex = 2;
             // 
             // tabPage1
@@ -168,35 +176,133 @@
             tabPage1.Location = new Point(4, 26);
             tabPage1.Name = "tabPage1";
             tabPage1.Padding = new Padding(3);
-            tabPage1.Size = new Size(863, 408);
+            tabPage1.Size = new Size(1051, 444);
             tabPage1.TabIndex = 0;
             tabPage1.Text = "Accounts";
             tabPage1.UseVisualStyleBackColor = true;
             // 
             // tabPage2
             // 
+            tabPage2.Controls.Add(tableLayoutPanel2);
             tabPage2.Controls.Add(btn_stopAll);
             tabPage2.Controls.Add(btn_startAll);
             tabPage2.Controls.Add(btn_taskAdd);
             tabPage2.Controls.Add(btn_taskDelete);
             tabPage2.Controls.Add(gv_tasks);
-            tabPage2.Controls.Add(btn_taskStop);
             tabPage2.Controls.Add(btn_taskEdit);
             tabPage2.Controls.Add(btn_taskReload);
             tabPage2.Controls.Add(btn_taskStart);
             tabPage2.Location = new Point(4, 26);
             tabPage2.Name = "tabPage2";
             tabPage2.Padding = new Padding(3);
-            tabPage2.Size = new Size(863, 408);
+            tabPage2.Size = new Size(1051, 444);
             tabPage2.TabIndex = 1;
             tabPage2.Text = "Tasks";
             tabPage2.UseVisualStyleBackColor = true;
+            // 
+            // tableLayoutPanel2
+            // 
+            tableLayoutPanel2.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Right;
+            tableLayoutPanel2.ColumnCount = 1;
+            tableLayoutPanel2.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            tableLayoutPanel2.Controls.Add(btn_taskSearch, 0, 6);
+            tableLayoutPanel2.Controls.Add(label6, 0, 4);
+            tableLayoutPanel2.Controls.Add(filter_account, 0, 5);
+            tableLayoutPanel2.Controls.Add(label7, 0, 2);
+            tableLayoutPanel2.Controls.Add(label5, 0, 0);
+            tableLayoutPanel2.Controls.Add(filter_status, 0, 1);
+            tableLayoutPanel2.Controls.Add(filter_query, 0, 3);
+            tableLayoutPanel2.Location = new Point(843, 39);
+            tableLayoutPanel2.Name = "tableLayoutPanel2";
+            tableLayoutPanel2.RowCount = 7;
+            tableLayoutPanel2.RowStyles.Add(new RowStyle());
+            tableLayoutPanel2.RowStyles.Add(new RowStyle(SizeType.Percent, 25F));
+            tableLayoutPanel2.RowStyles.Add(new RowStyle());
+            tableLayoutPanel2.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
+            tableLayoutPanel2.RowStyles.Add(new RowStyle());
+            tableLayoutPanel2.RowStyles.Add(new RowStyle(SizeType.Percent, 25F));
+            tableLayoutPanel2.RowStyles.Add(new RowStyle());
+            tableLayoutPanel2.Size = new Size(202, 399);
+            tableLayoutPanel2.TabIndex = 15;
+            // 
+            // btn_taskSearch
+            // 
+            btn_taskSearch.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            btn_taskSearch.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
+            btn_taskSearch.Location = new Point(2, 369);
+            btn_taskSearch.Margin = new Padding(2);
+            btn_taskSearch.Name = "btn_taskSearch";
+            btn_taskSearch.Size = new Size(198, 28);
+            btn_taskSearch.TabIndex = 15;
+            btn_taskSearch.Text = "Search";
+            btn_taskSearch.UseVisualStyleBackColor = true;
+            btn_taskSearch.Click += btn_taskSearch_Click;
+            // 
+            // label6
+            // 
+            label6.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
+            label6.AutoSize = true;
+            label6.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
+            label6.Location = new Point(3, 271);
+            label6.Name = "label6";
+            label6.Size = new Size(111, 17);
+            label6.TabIndex = 14;
+            label6.Text = "Filter by Account";
+            // 
+            // filter_account
+            // 
+            filter_account.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            filter_account.FormattingEnabled = true;
+            filter_account.Location = new Point(3, 291);
+            filter_account.Name = "filter_account";
+            filter_account.Size = new Size(196, 64);
+            filter_account.TabIndex = 12;
+            // 
+            // label7
+            // 
+            label7.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
+            label7.AutoSize = true;
+            label7.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
+            label7.Location = new Point(3, 96);
+            label7.Name = "label7";
+            label7.Size = new Size(99, 17);
+            label7.TabIndex = 14;
+            label7.Text = "Filter by Query";
+            // 
+            // label5
+            // 
+            label5.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
+            label5.AutoSize = true;
+            label5.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
+            label5.Location = new Point(3, 0);
+            label5.Name = "label5";
+            label5.Size = new Size(99, 17);
+            label5.TabIndex = 14;
+            label5.Text = "Filter by Status";
+            // 
+            // filter_status
+            // 
+            filter_status.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            filter_status.FormattingEnabled = true;
+            filter_status.Location = new Point(3, 20);
+            filter_status.Name = "filter_status";
+            filter_status.Size = new Size(196, 64);
+            filter_status.TabIndex = 12;
+            // 
+            // filter_query
+            // 
+            filter_query.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            filter_query.FormattingEnabled = true;
+            filter_query.Location = new Point(3, 116);
+            filter_query.Name = "filter_query";
+            filter_query.Size = new Size(196, 144);
+            filter_query.TabIndex = 12;
             // 
             // btn_stopAll
             // 
             btn_stopAll.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btn_stopAll.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
-            btn_stopAll.Location = new Point(776, 5);
+            btn_stopAll.Location = new Point(964, 5);
             btn_stopAll.Margin = new Padding(2);
             btn_stopAll.Name = "btn_stopAll";
             btn_stopAll.Size = new Size(82, 28);
@@ -209,7 +315,7 @@
             // 
             btn_startAll.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btn_startAll.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
-            btn_startAll.Location = new Point(690, 5);
+            btn_startAll.Location = new Point(878, 5);
             btn_startAll.Margin = new Padding(2);
             btn_startAll.Name = "btn_startAll";
             btn_startAll.Size = new Size(82, 28);
@@ -246,27 +352,14 @@
             // 
             gv_tasks.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             gv_tasks.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-            gv_tasks.Location = new Point(5, 38);
+            gv_tasks.Location = new Point(6, 38);
             gv_tasks.Margin = new Padding(2);
             gv_tasks.Name = "gv_tasks";
             gv_tasks.RowTemplate.DefaultCellStyle.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold, GraphicsUnit.Point, 0);
             gv_tasks.RowTemplate.DefaultCellStyle.Padding = new Padding(5, 0, 5, 0);
-            gv_tasks.Size = new Size(853, 365);
+            gv_tasks.Size = new Size(832, 400);
             gv_tasks.TabIndex = 2;
             gv_tasks.DoubleClick += gv_tasks_DoubleClick;
-            // 
-            // btn_taskStop
-            // 
-            btn_taskStop.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btn_taskStop.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
-            btn_taskStop.Location = new Point(587, 5);
-            btn_taskStop.Margin = new Padding(2);
-            btn_taskStop.Name = "btn_taskStop";
-            btn_taskStop.Size = new Size(99, 28);
-            btn_taskStop.TabIndex = 5;
-            btn_taskStop.Text = "Stop Selected";
-            btn_taskStop.UseVisualStyleBackColor = true;
-            btn_taskStop.Click += btn_taskStop_Click;
             // 
             // btn_taskEdit
             // 
@@ -284,7 +377,7 @@
             // 
             btn_taskReload.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btn_taskReload.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
-            btn_taskReload.Location = new Point(414, 5);
+            btn_taskReload.Location = new Point(705, 6);
             btn_taskReload.Margin = new Padding(2);
             btn_taskReload.Name = "btn_taskReload";
             btn_taskReload.Size = new Size(64, 28);
@@ -297,7 +390,7 @@
             // 
             btn_taskStart.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btn_taskStart.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
-            btn_taskStart.Location = new Point(482, 5);
+            btn_taskStart.Location = new Point(773, 6);
             btn_taskStart.Margin = new Padding(2);
             btn_taskStart.Name = "btn_taskStart";
             btn_taskStart.Size = new Size(101, 28);
@@ -313,7 +406,7 @@
             tabPage3.Controls.Add(tableLayoutPanel1);
             tabPage3.Location = new Point(4, 26);
             tabPage3.Name = "tabPage3";
-            tabPage3.Size = new Size(863, 408);
+            tabPage3.Size = new Size(1051, 444);
             tabPage3.TabIndex = 2;
             tabPage3.Text = "Settings";
             tabPage3.UseVisualStyleBackColor = true;
@@ -322,7 +415,7 @@
             // 
             btn_saveSettings.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btn_saveSettings.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
-            btn_saveSettings.Location = new Point(764, 76);
+            btn_saveSettings.Location = new Point(637, 76);
             btn_saveSettings.Margin = new Padding(2);
             btn_saveSettings.Name = "btn_saveSettings";
             btn_saveSettings.Size = new Size(82, 28);
@@ -363,7 +456,7 @@
             tableLayoutPanel1.RowStyles.Add(new RowStyle());
             tableLayoutPanel1.RowStyles.Add(new RowStyle());
             tableLayoutPanel1.RowStyles.Add(new RowStyle(SizeType.Absolute, 20F));
-            tableLayoutPanel1.Size = new Size(846, 68);
+            tableLayoutPanel1.Size = new Size(719, 68);
             tableLayoutPanel1.TabIndex = 12;
             // 
             // label1
@@ -381,9 +474,9 @@
             // 
             tb_downlaodInterval.Anchor = AnchorStyles.Left | AnchorStyles.Right;
             tb_downlaodInterval.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
-            tb_downlaodInterval.Location = new Point(559, 3);
+            tb_downlaodInterval.Location = new Point(496, 3);
             tb_downlaodInterval.Name = "tb_downlaodInterval";
-            tb_downlaodInterval.Size = new Size(284, 25);
+            tb_downlaodInterval.Size = new Size(220, 25);
             tb_downlaodInterval.TabIndex = 11;
             tb_downlaodInterval.TextAlign = HorizontalAlignment.Center;
             // 
@@ -403,7 +496,7 @@
             label3.Anchor = AnchorStyles.Right;
             label3.AutoSize = true;
             label3.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
-            label3.Location = new Point(433, 7);
+            label3.Location = new Point(370, 7);
             label3.Name = "label3";
             label3.Size = new Size(120, 17);
             label3.TabIndex = 13;
@@ -414,7 +507,7 @@
             label4.Anchor = AnchorStyles.Right;
             label4.AutoSize = true;
             label4.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
-            label4.Location = new Point(438, 38);
+            label4.Location = new Point(375, 38);
             label4.Name = "label4";
             label4.Size = new Size(115, 17);
             label4.TabIndex = 13;
@@ -426,7 +519,7 @@
             tb_ipAddress.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
             tb_ipAddress.Location = new Point(144, 3);
             tb_ipAddress.Name = "tb_ipAddress";
-            tb_ipAddress.Size = new Size(283, 25);
+            tb_ipAddress.Size = new Size(220, 25);
             tb_ipAddress.TabIndex = 10;
             tb_ipAddress.TabStop = false;
             // 
@@ -436,7 +529,7 @@
             tb_instagrapiSession.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
             tb_instagrapiSession.Location = new Point(144, 34);
             tb_instagrapiSession.Name = "tb_instagrapiSession";
-            tb_instagrapiSession.Size = new Size(283, 25);
+            tb_instagrapiSession.Size = new Size(220, 25);
             tb_instagrapiSession.TabIndex = 10;
             tb_instagrapiSession.TabStop = false;
             // 
@@ -444,9 +537,9 @@
             // 
             tb_instagrapiApiUrl.Anchor = AnchorStyles.Left | AnchorStyles.Right;
             tb_instagrapiApiUrl.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
-            tb_instagrapiApiUrl.Location = new Point(559, 34);
+            tb_instagrapiApiUrl.Location = new Point(496, 34);
             tb_instagrapiApiUrl.Name = "tb_instagrapiApiUrl";
-            tb_instagrapiApiUrl.Size = new Size(284, 25);
+            tb_instagrapiApiUrl.Size = new Size(220, 25);
             tb_instagrapiApiUrl.TabIndex = 10;
             tb_instagrapiApiUrl.TabStop = false;
             // 
@@ -454,7 +547,7 @@
             // 
             AutoScaleDimensions = new SizeF(7F, 17F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(895, 462);
+            ClientSize = new Size(1083, 498);
             Controls.Add(tabControl1);
             Font = new Font("Segoe UI", 9.75F, FontStyle.Regular, GraphicsUnit.Point, 0);
             Name = "MainForm";
@@ -466,6 +559,8 @@
             tabControl1.ResumeLayout(false);
             tabPage1.ResumeLayout(false);
             tabPage2.ResumeLayout(false);
+            tableLayoutPanel2.ResumeLayout(false);
+            tableLayoutPanel2.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)gv_tasks).EndInit();
             tabPage3.ResumeLayout(false);
             tabPage3.PerformLayout();
@@ -489,7 +584,6 @@
         private Button btn_taskAdd;
         private Button btn_taskDelete;
         private DataGridView gv_tasks;
-        private Button btn_taskStop;
         private Button btn_taskEdit;
         private Button btn_taskStart;
         private TextBox tb_ipAddress;
@@ -507,5 +601,13 @@
         private Button btn_taskReload;
         private Button btn_stopAll;
         private Button btn_startAll;
+        private CheckedListBox filter_status;
+        private CheckedListBox filter_query;
+        private TableLayoutPanel tableLayoutPanel2;
+        private Label label6;
+        private CheckedListBox filter_account;
+        private Label label7;
+        private Label label5;
+        private Button btn_taskSearch;
     }
 }

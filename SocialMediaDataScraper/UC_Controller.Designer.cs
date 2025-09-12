@@ -33,6 +33,14 @@
             cb_commands = new ComboBox();
             btn_runCommand = new Button();
             btn_stopCommand = new Button();
+            tabPage2 = new TabPage();
+            gv_tasks = new DataGridView();
+            tabPage1 = new TabPage();
+            tabControl1 = new TabControl();
+            tabPage2.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)gv_tasks).BeginInit();
+            tabPage1.SuspendLayout();
+            tabControl1.SuspendLayout();
             SuspendLayout();
             // 
             // tb_username
@@ -50,9 +58,9 @@
             listBox.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             listBox.Font = new Font("Consolas", 11.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
             listBox.FormattingEnabled = true;
-            listBox.Location = new Point(3, 35);
+            listBox.Location = new Point(6, 6);
             listBox.Name = "listBox";
-            listBox.Size = new Size(536, 346);
+            listBox.Size = new Size(516, 292);
             listBox.TabIndex = 4;
             listBox.DoubleClick += listBox_DoubleClick;
             // 
@@ -64,18 +72,18 @@
             cb_commands.FormattingEnabled = true;
             cb_commands.Location = new Point(171, 5);
             cb_commands.Name = "cb_commands";
-            cb_commands.Size = new Size(182, 25);
+            cb_commands.Size = new Size(252, 25);
             cb_commands.TabIndex = 2;
             // 
             // btn_runCommand
             // 
             btn_runCommand.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btn_runCommand.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
-            btn_runCommand.Location = new Point(359, 4);
+            btn_runCommand.Location = new Point(429, 4);
             btn_runCommand.Name = "btn_runCommand";
-            btn_runCommand.Size = new Size(84, 26);
+            btn_runCommand.Size = new Size(52, 26);
             btn_runCommand.TabIndex = 3;
-            btn_runCommand.Text = "Run Action";
+            btn_runCommand.Text = "Start";
             btn_runCommand.UseVisualStyleBackColor = true;
             btn_runCommand.Click += btn_runCommand_Click;
             // 
@@ -84,19 +92,65 @@
             btn_stopCommand.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btn_stopCommand.Enabled = false;
             btn_stopCommand.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
-            btn_stopCommand.Location = new Point(449, 4);
+            btn_stopCommand.Location = new Point(487, 4);
             btn_stopCommand.Name = "btn_stopCommand";
-            btn_stopCommand.Size = new Size(90, 26);
+            btn_stopCommand.Size = new Size(52, 26);
             btn_stopCommand.TabIndex = 3;
-            btn_stopCommand.Text = "Stop Action";
+            btn_stopCommand.Text = "Stop";
             btn_stopCommand.UseVisualStyleBackColor = true;
-
+            // 
+            // tabPage2
+            // 
+            tabPage2.Controls.Add(gv_tasks);
+            tabPage2.Location = new Point(4, 26);
+            tabPage2.Name = "tabPage2";
+            tabPage2.Padding = new Padding(3);
+            tabPage2.Size = new Size(528, 313);
+            tabPage2.TabIndex = 1;
+            tabPage2.Text = "Tasks";
+            tabPage2.UseVisualStyleBackColor = true;
+            // 
+            // gv_tasks
+            // 
+            gv_tasks.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            gv_tasks.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            gv_tasks.Location = new Point(5, 5);
+            gv_tasks.Margin = new Padding(2);
+            gv_tasks.Name = "gv_tasks";
+            gv_tasks.RowTemplate.DefaultCellStyle.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold, GraphicsUnit.Point, 0);
+            gv_tasks.RowTemplate.DefaultCellStyle.Padding = new Padding(5, 0, 5, 0);
+            gv_tasks.Size = new Size(518, 303);
+            gv_tasks.TabIndex = 3;
+            gv_tasks.DoubleClick += gv_tasks_DoubleClick;
+            // 
+            // tabPage1
+            // 
+            tabPage1.Controls.Add(listBox);
+            tabPage1.Location = new Point(4, 26);
+            tabPage1.Name = "tabPage1";
+            tabPage1.Padding = new Padding(3);
+            tabPage1.Size = new Size(528, 313);
+            tabPage1.TabIndex = 0;
+            tabPage1.Text = "Logs";
+            tabPage1.UseVisualStyleBackColor = true;
+            // 
+            // tabControl1
+            // 
+            tabControl1.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            tabControl1.Controls.Add(tabPage1);
+            tabControl1.Controls.Add(tabPage2);
+            tabControl1.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
+            tabControl1.Location = new Point(3, 36);
+            tabControl1.Name = "tabControl1";
+            tabControl1.SelectedIndex = 0;
+            tabControl1.Size = new Size(536, 343);
+            tabControl1.TabIndex = 5;
             // 
             // UC_Controller
             // 
             AutoScaleDimensions = new SizeF(6F, 13F);
             AutoScaleMode = AutoScaleMode.Font;
-            Controls.Add(listBox);
+            Controls.Add(tabControl1);
             Controls.Add(tb_username);
             Controls.Add(btn_stopCommand);
             Controls.Add(btn_runCommand);
@@ -105,6 +159,10 @@
             Name = "UC_Controller";
             Size = new Size(542, 382);
             Load += UC_Controller_Load;
+            tabPage2.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)gv_tasks).EndInit();
+            tabPage1.ResumeLayout(false);
+            tabControl1.ResumeLayout(false);
             ResumeLayout(false);
             PerformLayout();
         }
@@ -115,5 +173,9 @@
         private ComboBox cb_commands;
         private Button btn_runCommand;
         private Button btn_stopCommand;
+        private TabPage tabPage2;
+        private TabPage tabPage1;
+        private TabControl tabControl1;
+        private DataGridView gv_tasks;
     }
 }

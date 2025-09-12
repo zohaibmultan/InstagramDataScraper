@@ -5,7 +5,6 @@ using Newtonsoft.Json.Linq;
 using SocialMediaDataScraper.Common;
 using SocialMediaDataScraper.Models;
 using System.ComponentModel;
-using System.Threading.Tasks;
 
 namespace SocialMediaDataScraper
 {
@@ -54,6 +53,12 @@ namespace SocialMediaDataScraper
 
             tb_downlaodInterval.Minimum = 0;
             tb_downlaodInterval.Maximum = int.MaxValue;
+
+            filter_status.Items.AddRange([.. DS_BrowserTask_Status.GetAllStatus()]);
+            filter_query.Items.AddRange([.. QueryAction.GetAllQueryActions().Where(x => !string.IsNullOrEmpty(x))]);
+
+            var accounts = DbHelper.GetAll<DS_UserAccount>().Select(x => x.Username).ToArray();
+            filter_account.Items.AddRange(accounts);
         }
 
         private void MainForm_Shown(object sender, EventArgs e)
@@ -229,15 +234,15 @@ namespace SocialMediaDataScraper
 
         void LoadAccountsGrid()
         {
-            gv_browsers.DataSource = userAccounts;
             var data = DbHelper.GetAll<DS_UserAccount>();
-            userAccounts.Clear();
 
+            userAccounts.Clear();
             foreach (DS_UserAccount browser in data)
             {
                 userAccounts.Add(browser);
             }
 
+            gv_browsers.DataSource = userAccounts.OrderByDescending(x => x.IsActive).ToList();
             gv_browsers.Refresh();
         }
 
@@ -344,10 +349,25 @@ namespace SocialMediaDataScraper
         #endregion
 
         #region Tasks Tab
-        private void LoadTasksGrid()
+        private void LoadTasksGrid(List<string> statusFilters = null, List<string> queryFilters = null, List<string> accountFilters = null)
         {
             browserTasks.Clear();
-            var data = DbHelper.GetAll<DS_BrowserTask>().OrderByDescending(x => x.CreatedAt);
+            var data = DbHelper.GetAll<DS_BrowserTask>().ToList();
+
+            if (statusFilters != null && statusFilters.Count > 0)
+            {
+                data = [.. data.Where(x => statusFilters.Contains(x.Status))];
+            }
+
+            if (queryFilters != null && queryFilters.Count > 0)
+            {
+                data = [.. data.Where(x => queryFilters.Contains(x.QueryAction))];
+            }
+
+            if (accountFilters != null && accountFilters.Count > 0)
+            {
+                data = [.. data.Where(x => accountFilters.Contains(x.DoneBy))];
+            }
 
             foreach (DS_BrowserTask task in data)
             {
@@ -390,22 +410,22 @@ namespace SocialMediaDataScraper
 
             btn_taskDelete.Enabled = false;
             btn_taskStart.Enabled = false;
-            btn_taskStop.Enabled = false;
             btn_startAll.Enabled = false;
-            btn_taskStop.Enabled = true;
 
             var subLists = taskList.SplitInto(dsBrowsers.Count, true);
             var zipLists = dsBrowsers.Zip(subLists, (dsBrowser, tasks) => new { dsBrowser, tasks }).ToList();
+            var threads = new List<Task>();
+
             foreach (var zip in zipLists)
             {
-                await zip.dsBrowser.Value.uc_controller.StartTasks(zip.tasks);
+                threads.Add(zip.dsBrowser.Value.uc_controller.StartTasks(zip.tasks));
             }
+
+            await Task.WhenAll(threads);
 
             btn_taskDelete.Enabled = true;
             btn_taskStart.Enabled = true;
-            btn_taskStop.Enabled = true;
             btn_startAll.Enabled = true;
-            btn_taskStop.Enabled = true;
 
             LoadTasksGrid();
         }
@@ -505,9 +525,31 @@ namespace SocialMediaDataScraper
 
             btn_taskDelete.Enabled = true;
             btn_taskStart.Enabled = true;
-            btn_taskStop.Enabled = true;
             btn_startAll.Enabled = true;
             btn_stopAll.Enabled = true;
+        }
+
+        private void btn_taskSearch_Click(object sender, EventArgs e)
+        {
+            var status = new List<string>();
+            foreach (var item in filter_status.CheckedItems)
+            {
+                status.Add(item.ToString());
+            }
+
+            var query = new List<string>();
+            foreach (var item in filter_query.CheckedItems)
+            {
+                query.Add(item.ToString());
+            }
+
+            var account = new List<string>();
+            foreach (var item in filter_account.CheckedItems)
+            {
+                account.Add(item.ToString());
+            }
+
+            LoadTasksGrid(status, query, account);
         }
         #endregion
 
