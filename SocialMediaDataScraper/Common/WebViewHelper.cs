@@ -190,12 +190,15 @@ namespace SocialMediaDataScraper.Models
 
         private static EventHandler<CoreWebView2WebMessageReceivedEventArgs> handler;
 
-        public static async Task<(bool, string)> ExecuteScriptForResult(WebView2 webView, string script)
+        public static async Task<(bool, string)> ExecuteScriptForResult(WebView2 webView, string script, CancellationToken cancellationToken = default)
         {
             if (webView.CoreWebView2 == null) return (false, "WebView2 is null");
 
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(30));
             var tcs = new TaskCompletionSource<(bool, string)>();
 
+            EventHandler<CoreWebView2WebMessageReceivedEventArgs> handler = null;
             handler = (s, e) =>
             {
                 var result = e.WebMessageAsJson;
@@ -205,9 +208,21 @@ namespace SocialMediaDataScraper.Models
 
             webView.CoreWebView2.WebMessageReceived += handler;
 
-            await webView.ExecuteScriptAsync(script);
-
-            return await tcs.Task;
+            try
+            {
+                await webView.ExecuteScriptAsync(script).ConfigureAwait(false);
+                return await tcs.Task.WaitAsync(cts.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                webView.CoreWebView2.WebMessageReceived -= handler;
+                return (false, "Operation timed out after 30 seconds");
+            }
+            catch (Exception ex)
+            {
+                webView.CoreWebView2.WebMessageReceived -= handler;
+                return (false, $"Script execution failed: {ex.Message}");
+            }
         }
     }
 }

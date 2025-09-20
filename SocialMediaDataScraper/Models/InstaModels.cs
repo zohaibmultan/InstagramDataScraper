@@ -195,6 +195,7 @@ namespace SocialMediaDataScraper.Models
         public string full_name { get; set; }
         public string profile_pic_url { get; set; }
         public string username { get; set; }
+        public string follower_username { get; set; }
     }
 
     ////////////////////////////////////////////////

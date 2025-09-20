@@ -131,6 +131,7 @@ namespace SocialMediaDataScraper.Models
         public const string GetFollowings = "Get Followings of User";
         public const string GetFollowingsAjax = "Get Followings of User (Ajax)";
         public const string MonitorFollowRequest = "Monitor Follow Request";
+        public const string GetUserPkFromUsername = "Get user PK from username";
 
 
         public static List<string> GetAllQueryActions()

@@ -1,18 +1,16 @@
 ﻿#nullable disable
 
 using LiteDB;
+using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using SocialMediaDataScraper.Common;
 using SocialMediaDataScraper.Models;
 using System.Collections;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Security.Policy;
-using System.Threading;
-using System.Threading.Tasks;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.StartPanel;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.TrackBar;
+using System.Diagnostics;
+using System.Text;
 
 namespace SocialMediaDataScraper
 {
@@ -187,7 +185,7 @@ namespace SocialMediaDataScraper
                 if (cancellationToken?.IsCancellationRequested == true) break;
 
                 gv_tasks.Refresh();
-                await Task.Delay(new Random().Next(3, 10));
+                await Task.Delay(new Random().Next(5, 15));
             }
         }
 
@@ -245,6 +243,10 @@ namespace SocialMediaDataScraper
 
                     case QueryAction.MonitorFollowRequest:
                         await MonitorFollowRequest();
+                        break;
+
+                    case QueryAction.GetUserPkFromUsername:
+                        await GetUserPkFromUsername(query as QueryProfile, taskID);
                         break;
                 }
 
@@ -307,6 +309,88 @@ namespace SocialMediaDataScraper
             Log(success ? DS_BrowserLogType.Info : DS_BrowserLogType.Error, success ? "Following data saved" : "Unable to save following data");
         }
 
+        private async Task<InstaResult<string>> RunPythonScript(string func, string param, int max = 0, int amt = 0)
+        {
+            try
+            {
+                var workingDir = @"D:\04_Practice\SocialMediaDataScraperPython";
+                var pythonExe = @$"{workingDir}\.venv\Scripts\python.exe";
+                var pythonScript = @$"{workingDir}\instagram_handler.py";
+                var arguments = $"--func={func} --parm={param}";
+                arguments += max == 0 ? "" : $" max={max}";
+                arguments += amt == 0 ? "" : $" amt={amt}";
+
+                if (!System.IO.File.Exists(pythonExe))
+                {
+                    throw new System.IO.FileNotFoundException($"Python executable not found at: {pythonExe}");
+                }
+
+                if (!System.IO.File.Exists(pythonScript))
+                {
+                    throw new System.IO.FileNotFoundException($"Python script not found at: {pythonScript}");
+                }
+
+                ProcessStartInfo processStartInfo = new ProcessStartInfo
+                {
+                    FileName = pythonExe,
+                    Arguments = $"{pythonScript} {arguments}",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    WorkingDirectory = workingDir
+                };
+
+                using var process = new Process { StartInfo = processStartInfo };
+                var output = new StringBuilder();
+                var error = new StringBuilder();
+                var appendOutput = false;
+
+                process.OutputDataReceived += (sender, e) =>
+                {
+                    if (!string.IsNullOrEmpty(e.Data))
+                    {
+                        if (appendOutput)
+                        {
+                            output.AppendLine(e.Data);
+                        }
+
+                        if (e.Data == "--xx--xx--")
+                        {
+                            appendOutput = true;
+                        }
+                    }
+                };
+                process.ErrorDataReceived += (sender, e) =>
+                {
+                    if (!string.IsNullOrEmpty(e.Data))
+                        error.AppendLine(e.Data);
+                };
+
+                process.Start();
+                process.BeginOutputReadLine();
+                process.BeginErrorReadLine();
+
+                await process.WaitForExitAsync();
+
+                if (process.ExitCode == 0)
+                {
+                    return output.ToString();
+                }
+                else
+                {
+                    Console.WriteLine(error.ToString());
+                }
+
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+            }
+
+            return null;
+        }
+
         #region Commands
         private async Task RecheckLoginStatus()
         {
@@ -321,7 +405,37 @@ namespace SocialMediaDataScraper
             }
 
             userAccount.IsLogin = true;
+            tb_userPk.SetTextSafe(res.Content);
             Log(DS_BrowserLogType.Info, "OK", logId, true);
+        }
+
+        private async Task MonitorFollowRequest()
+        {
+            cancellationToken = new CancellationTokenSource();
+            EventHandler canellationEvent = (sender, e) => _ = StopTasks();
+            btn_stopCommand.Click += canellationEvent;
+
+            Log(DS_BrowserLogType.Info, $"-------- MONITORING STARTED --------");
+            await instaHelper.MonitorFollowRequest(new InstaBulkTaskParams<List<string>>()
+            {
+                WebView = webView,
+                CancellationToken = cancellationToken,
+                TaskProgress = async (s, e) =>
+                {
+                    var user_id = e.Message;
+                    var logId = Log(DS_BrowserLogType.Info, $"{user_id} captured...", content: $"{user_id}");
+
+                    await Task.Delay(new Random().Next(3, 10) * 1000);
+
+                    var username = await instaHelper.GetUsernameByUserPk(user_id);
+                    StaticInfo.CreateTasksFromUserId(user_id, username);
+                    Log(DS_BrowserLogType.Info, $"Task created {username}", logId, true, $"{user_id} - {username}");
+                },
+            });
+            Log(DS_BrowserLogType.Info, $"-------- MONITORING ENDED --------");
+
+            btn_stopCommand.Click -= canellationEvent;
+            cancellationToken.Dispose();
         }
 
         private async Task GetUserProfile(QueryProfile query = null, ObjectId taskId = null)
@@ -355,6 +469,48 @@ namespace SocialMediaDataScraper
                 Log(DS_BrowserLogType.Info, $"Profile data collected, Double click to view", content: jsonData);
 
                 if (taskId != null) data.Content.taskId = taskId;
+                var model = DbHelper.SaveOne(data.Content);
+
+                Log(model != null ? DS_BrowserLogType.Info : DS_BrowserLogType.Error, model != null ? "Profile data saved" : "Unable to save profile data");
+            }
+            else if (data != null && !data.Status)
+            {
+                data.Errors.ForEach(error => Log(DS_BrowserLogType.Error, error));
+            }
+            else
+            {
+                Log(DS_BrowserLogType.Error, "Collected data is null");
+            }
+
+            Log(DS_BrowserLogType.Info, $"-------- GET PROFILE END --------");
+        }
+
+        private async Task GetUserProfilePython(QueryProfile query = null, ObjectId taskId = null)
+        {
+            if (webView == null || webView.CoreWebView2 == null) return;
+
+            if (query == null)
+            {
+                var (res, newQuery) = ShowQueryDialog<QueryProfile>();
+                if (res != DialogResult.OK) return;
+                query = newQuery;
+            }
+
+            if (!string.IsNullOrEmpty(query.ProfileUrl))
+            {
+                query.Username = new Uri(query.ProfileUrl).AbsolutePath.Trim('/');
+            }
+
+            Log(DS_BrowserLogType.Info, $"-------- GET PROFILE --------");
+            Log(DS_BrowserLogType.Info, $"Getting profile {query.Username}...");
+            var data = await RunPythonScript("get_user", query.Username);
+
+            if (data != null && data.Status)
+            {
+                Log(DS_BrowserLogType.Info, $"Profile data collected, Double click to view", content: data.Content);
+                var root = JObject.Parse(data.Content);
+                
+                //if (taskId != null) root["taskId"] = taskId;
                 var model = DbHelper.SaveOne(data.Content);
 
                 Log(model != null ? DS_BrowserLogType.Info : DS_BrowserLogType.Error, model != null ? "Profile data saved" : "Unable to save profile data");
@@ -418,6 +574,7 @@ namespace SocialMediaDataScraper
             Log(DS_BrowserLogType.Info, $"-------- GET POST END --------");
         }
 
+        // todo: jab post end ho jatay hy to system wait per laga rehata hy
         private async Task GetPostsByUser(QueryBulkPosts query = null, ObjectId taskId = null)
         {
             if (webView == null || webView.CoreWebView2 == null) return;
@@ -593,17 +750,47 @@ namespace SocialMediaDataScraper
                 query = newQuery;
             }
 
+            if (string.IsNullOrEmpty(query.Username) && query.UserPK != 0)
+            {
+                query.Username = await instaHelper.GetUsernameByUserPk(query.UserPK.ToString());
+            }
+
+            if (query.UserPK == 0 && !string.IsNullOrEmpty(query.Username))
+            {
+                var result = await instaHelper.GetUserPkByUsername(webView, query.Username);
+                if (result.Status)
+                {
+                    var ans = long.TryParse(result.Content, out long userPkLong);
+                    query.UserPK = ans ? userPkLong : query.UserPK;
+                }
+            }
+
+            if (query.UserPK == 0)
+            {
+                Log(DS_BrowserLogType.Error, $"UserPk is not available, {query.UserPK}");
+                return;
+            }
+
+            bool isLoading = !string.IsNullOrEmpty(query.Username);
             cancellationToken = new CancellationTokenSource();
             EventHandler canellationEvent = (sender, e) => _ = StopTasks();
+            EventHandler<CoreWebView2NavigationCompletedEventArgs> navigationComplete = null;
+            navigationComplete = (s, e) =>
+            {
+                isLoading = false;
+            };
 
             Log(DS_BrowserLogType.Info, $"-------- GET FOLLOWINGS --------");
             btn_stopCommand.Click += canellationEvent;
 
-            query.Username = await instaHelper.GetUsernameByUserPk(query.UserPK.ToString());
             if (!string.IsNullOrEmpty(query.Username))
             {
                 webView.Source = new Uri($"https://www.instagram.com/{query.Username}");
+                webView.CoreWebView2.NavigationCompleted += navigationComplete;
+                isLoading = true;
             }
+
+            while (isLoading) await Task.Delay(1000);
 
             Log(DS_BrowserLogType.Info, $"Getting followings {query.Username}...");
             var data = await instaHelper.GetFollowingsAjax(
@@ -627,9 +814,11 @@ namespace SocialMediaDataScraper
             );
 
             if (taskId != null) data.Content.ForEach(x => x.taskId = taskId);
+            if (!string.IsNullOrEmpty(query.Username)) data.Content.ForEach(x => x.follower_username = query.Username);
             SaveTaskData<List<InstaFollowing>, InstaFollowing>(data);
 
             btn_stopCommand.Click -= canellationEvent;
+            webView.CoreWebView2.NavigationCompleted -= navigationComplete;
             Log(DS_BrowserLogType.Info, $"-------- GET FOLLOWINGS END --------");
         }
 
@@ -645,7 +834,7 @@ namespace SocialMediaDataScraper
             }
 
             cancellationToken = new CancellationTokenSource();
-            EventHandler canellationEvent = (sender, e) => StopTasks();
+            EventHandler canellationEvent = (sender, e) => _ = StopTasks();
 
             Log(DS_BrowserLogType.Info, $"-------- GET POST COMMENTS --------");
             btn_stopCommand.Click += canellationEvent;
@@ -677,33 +866,46 @@ namespace SocialMediaDataScraper
             Log(DS_BrowserLogType.Info, $"-------- GET POST COMMENTS END --------");
         }
 
-        private async Task MonitorFollowRequest()
+        private async Task<string> GetUserPkFromUsername(QueryProfile query = null, ObjectId taskId = null)
         {
-            cancellationToken = new CancellationTokenSource();
-            EventHandler canellationEvent = (sender, e) => StopTasks();
-            btn_stopCommand.Click += canellationEvent;
+            if (webView == null || webView.CoreWebView2 == null) return null;
 
-            Log(DS_BrowserLogType.Info, $"-------- MONITORING STARTED --------");
-            await instaHelper.MonitorFollowRequest(new InstaBulkTaskParams<List<string>>()
+            if (query == null)
             {
-                WebView = webView,
-                CancellationToken = cancellationToken,
-                TaskProgress = async (s, e) =>
+                var (res, newQuery) = ShowQueryDialog<QueryProfile>();
+                if (res != DialogResult.OK) return null;
+                query = newQuery;
+            }
+
+            try
+            {
+                Log(DS_BrowserLogType.Info, $"-------- GET USER PK --------");
+
+                if (string.IsNullOrEmpty(query.Username))
                 {
-                    var user_id = e.Message;
-                    var logId = Log(DS_BrowserLogType.Info, $"{user_id} captured...", content: $"{user_id}");
+                    Log(DS_BrowserLogType.Error, $"Username is invalid, {query.Username}");
+                    return null;
+                }
 
-                    await Task.Delay(new Random().Next(3, 10) * 1000);
+                var result = await instaHelper.GetUserPkByUsername(webView, query.Username);
+                if (!result.Status)
+                {
+                    result.Errors.ForEach(x => Log(DS_BrowserLogType.Error, x));
+                    return null;
+                }
 
-                    var username = await instaHelper.GetUsernameByUserPk(user_id);
-                    StaticInfo.CreateTasksFromUserId(user_id, username);
-                    Log(DS_BrowserLogType.Info, $"Task created {username}", logId, true, $"{user_id} - {username}");
-                },
-            });
-            Log(DS_BrowserLogType.Info, $"-------- MONITORING ENDED --------");
-
-            btn_stopCommand.Click -= canellationEvent;
-            cancellationToken.Dispose();
+                Log(DS_BrowserLogType.Info, $"User pk - {result.Content}");
+                return result.Content;
+            }
+            catch (Exception ex)
+            {
+                ex.GetAllInnerMessages().ForEach(x => Log(DS_BrowserLogType.Error, x));
+                return null;
+            }
+            finally
+            {
+                Log(DS_BrowserLogType.Info, $"-------- GET USER PK END --------");
+            }
         }
         #endregion
 

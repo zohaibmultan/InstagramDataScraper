@@ -222,13 +222,13 @@ namespace SocialMediaDataScraper.Models
         }
 
 
-        public async Task<InstaResult<List<InstaReel>>> TestLogin(WebView2 webView, string username, TimeSpan? waitInSeconds = null)
+        public async Task<InstaResult<string>> TestLogin(WebView2 webView, string username, TimeSpan? waitInSeconds = null)
         {
             var requestFilter = "graphql/query";
             var requestUrl = $"https://www.instagram.com/{username}";
             var responseFilterKey = "X-Root-Field-Name";
             var responseFilterValue = "xdt_api__v1__feed__reels_tray";
-            var tcs = new TaskCompletionSource<InstaResult<List<InstaReel>>>();
+            var tcs = new TaskCompletionSource<InstaResult<string>>();
             var cts = new CancellationTokenSource(waitInSeconds ?? TimeSpan.FromSeconds(60));
             var errors = new List<string>();
 
@@ -248,23 +248,24 @@ namespace SocialMediaDataScraper.Models
                     var (status, rootObject, errors) = await GetWebResponseJsonObject(e);
                     if (!status)
                     {
-                        tcs.TrySetResult(new InstaResult<List<InstaReel>> { Status = false, Errors = errors });
+                        tcs.TrySetResult(new() { Status = false, Errors = errors });
                         return;
                     }
 
                     var feed = rootObject?["data"]?[responseFilterValue]?["tray"]?.ToObject<List<InstaReel>>();
                     if (feed == null)
                     {
-                        tcs.TrySetResult(new InstaResult<List<InstaReel>> { Status = false, Errors = ["Required node not found"] });
+                        tcs.TrySetResult(new() { Status = false, Errors = ["Required node not found"] });
                         return;
                     }
 
+                    var userPk = rootObject?["data"]?["xdt_viewer"]?["user"]?["id"]?.ToString();
                     isLogin = true;
 
-                    tcs.SetResult(new InstaResult<List<InstaReel>>()
+                    tcs.SetResult(new()
                     {
                         Status = true,
-                        Content = feed,
+                        Content = userPk,
                     });
                 }
                 catch (Exception ex)
@@ -279,7 +280,7 @@ namespace SocialMediaDataScraper.Models
                 webView.CoreWebView2.WebResourceResponseReceived += WebView_WebResourceResponseReceived;
                 NavigateOrReload(webView, requestUrl);
 
-                cts.Token.Register(() => tcs.TrySetResult(new InstaResult<List<InstaReel>>()
+                cts.Token.Register(() => tcs.TrySetResult(new()
                 {
                     Status = false,
                     Content = null,
@@ -290,7 +291,7 @@ namespace SocialMediaDataScraper.Models
             }
             catch (Exception ex)
             {
-                return new InstaResult<List<InstaReel>>
+                return new InstaResult<string>
                 {
                     Status = false,
                     Content = null,
@@ -299,7 +300,11 @@ namespace SocialMediaDataScraper.Models
             }
             finally
             {
-                webView.CoreWebView2.WebResourceResponseReceived -= WebView_WebResourceResponseReceived;
+                if (webView?.CoreWebView2 != null)
+                {
+                    webView.CoreWebView2.WebResourceResponseReceived -= WebView_WebResourceResponseReceived;
+                }
+
                 cts.Dispose();
             }
         }
@@ -770,7 +775,6 @@ namespace SocialMediaDataScraper.Models
             var collection = new List<InstaFollowing>();
             var successAttempts = 0;
             var failedAttempts = 0;
-            var hasMore = false;
             var nextMaxId = 0;
 
             void ProcessAjaxResult(bool resultStatus, string result)
@@ -807,8 +811,7 @@ namespace SocialMediaDataScraper.Models
                     return;
                 }
 
-                hasMore = root["data"]?["has_more"]?.Value<bool>() ?? false;
-                nextMaxId = root["data"]?["next_max_id"]?.Value<int>() ?? 0;
+                nextMaxId = root["data"]?["next_max_id"]?.Value<int>() ?? -1;
                 var list = new List<InstaFollowing>();
 
                 foreach (var user in users)
@@ -836,7 +839,7 @@ namespace SocialMediaDataScraper.Models
                     $"fetchFollowing('{requestId}','{userPk}','{username}')" :
                     $"fetchFollowing('{requestId}','{userPk}','{username}', {nextMaxId})";
 
-                var (status, result) = await WebViewHelper.ExecuteScriptForResult(taskParams.WebView, script);
+                var (status, result) = await WebViewHelper.ExecuteScriptForResult(taskParams.WebView, script, taskParams.CancellationToken.Token);
                 ProcessAjaxResult(status, result);
             }
 
@@ -859,7 +862,7 @@ namespace SocialMediaDataScraper.Models
                 {
                     await CallAjaxAsync();
 
-                    if (hasMore == false) break;
+                    if (nextMaxId == -1) break;
                     if (collection.Count >= taskParams.RecordsCount) break;
                     if (failedAttempts == taskParams.FailedAttempts) break;
                     if (successAttempts % taskParams.LoopBreakAttempts == 0)
@@ -1089,7 +1092,7 @@ namespace SocialMediaDataScraper.Models
             var requestFilter = "graphql/query";
             var requestFilterValue = "xdt_api__v1__friendships__create__target_user_id";
             var tcs = new TaskCompletionSource<InstaResult<List<string>>>();
-            var collection = new List<string>();    
+            var collection = new List<string>();
 
             bool IsValidRequest(CoreWebView2WebResourceRequest Request)
             {
@@ -1186,12 +1189,62 @@ namespace SocialMediaDataScraper.Models
 
                 var json = await response.Content.ReadAsStringAsync();
                 var doc = JObject.Parse(json);
-                var userPk = doc?["users"][0]?["user"]?["pk"]?.ToString();
+                var userPk = doc?["users"]?[0]?["user"]?["pk"]?.ToString();
                 return userPk;
             }
             catch (Exception)
             {
                 return null;
+            }
+        }
+
+        public async Task<InstaResult<string>> GetUserPkByUsername(WebView2 webview, string username)
+        {
+            var scriptName = "AjaxGetUserPk.js";
+
+            async Task<string> CallAjaxAsync()
+            {
+                var requestId = Guid.NewGuid().ToString();
+                var script = $"fetchUserPk('{username}')";
+
+                var (status, result) = await WebViewHelper.ExecuteScriptForResult(webview, script);
+
+                var root = JObject.Parse(result);
+                var user_pk = root?["data"]?["users"]?[0]?["user"]?["pk"]?.ToString();
+                return user_pk;
+            }
+
+            try
+            {
+                var (status, scriptText) = GetScriptFromFile(scriptName);
+                if (!status)
+                {
+                    return new()
+                    {
+                        Status = false,
+                        Content = null,
+                        Errors = [$"{scriptName} not found"]
+                    };
+                }
+
+                await webview.ExecuteScriptAsync(scriptText);
+                var userPk = await CallAjaxAsync();
+
+                return new()
+                {
+                    Status = !string.IsNullOrEmpty(userPk),
+                    Content = userPk,
+                    Errors = string.IsNullOrEmpty(userPk) ? [$"User pk not found for username {username}"] : null,
+                };
+            }
+            catch (Exception ex)
+            {
+                return new()
+                {
+                    Status = false,
+                    Content = null,
+                    Errors = ex.GetAllInnerMessages()
+                };
             }
         }
     }
