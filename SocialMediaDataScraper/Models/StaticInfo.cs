@@ -287,5 +287,8 @@ namespace SocialMediaDataScraper.Models
         public string Password { get; set; }
         public string InstagrapiUrl { get; set; }
         public string InstagrapiSessionId { get; set; }
+        public string PythonScriptDirectory { get; set; }
+        public string PythonExeDirectory { get; set; }
+        public string PythonScriptFileName { get; set; }
     }
 }

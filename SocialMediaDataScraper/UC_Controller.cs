@@ -11,6 +11,7 @@ using System.Collections;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace SocialMediaDataScraper
 {
@@ -313,8 +314,8 @@ namespace SocialMediaDataScraper
         {
             try
             {
-                var workingDir = @"D:\04_Practice\SocialMediaDataScraperPython";
-                var pythonExe = @$"{workingDir}\.venv\Scripts\python.exe";
+                var workingDir = StaticInfo.AppSetting.PythonScriptDirectory;
+                var pythonExe = StaticInfo.AppSetting.PythonExeDirectory;
                 var pythonScript = @$"{workingDir}\instagram_handler.py";
                 var arguments = $"--func={func} --parm={param}";
                 arguments += max == 0 ? "" : $" max={max}";
@@ -330,7 +331,7 @@ namespace SocialMediaDataScraper
                     throw new System.IO.FileNotFoundException($"Python script not found at: {pythonScript}");
                 }
 
-                ProcessStartInfo processStartInfo = new ProcessStartInfo
+                var processStartInfo = new ProcessStartInfo
                 {
                     FileName = pythonExe,
                     Arguments = $"{pythonScript} {arguments}",
@@ -375,20 +376,31 @@ namespace SocialMediaDataScraper
 
                 if (process.ExitCode == 0)
                 {
-                    return output.ToString();
+                    return new()
+                    {
+                        Status = true,
+                        Content = output.ToString()
+                    };
                 }
                 else
                 {
-                    Console.WriteLine(error.ToString());
+                    return new()
+                    {
+                        Status = false,
+                        Content = null,
+                        Errors = [error.ToString()]
+                    };
                 }
-
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"An error occurred: {ex.Message}");
+                return new()
+                {
+                    Status = false,
+                    Content = null,
+                    Errors = ex.GetAllInnerMessages()
+                };
             }
-
-            return null;
         }
 
         #region Commands

@@ -98,6 +98,39 @@ namespace SocialMediaDataScraper.Models
             }
         }
 
+        private async Task<bool> NavigateOrReloadAsync(WebView2 webView, string requestUrl)
+        {
+            var tcs = new TaskCompletionSource<bool>();
+
+            void OnNavigationCompleted(object sender, CoreWebView2NavigationCompletedEventArgs e)
+            {
+                webView.CoreWebView2.NavigationCompleted -= OnNavigationCompleted;
+                tcs.SetResult(e.IsSuccess);
+            }
+
+            webView.CoreWebView2.NavigationCompleted += OnNavigationCompleted;
+
+            if (webView.Source.ToString().Equals(requestUrl, StringComparison.CurrentCultureIgnoreCase))
+            {
+                webView.CoreWebView2.Reload();
+            }
+            else
+            {
+                webView.Source = new Uri(requestUrl);
+            }
+
+            var timeoutTask = Task.Delay(TimeSpan.FromSeconds(60));
+            var completedTask = await Task.WhenAny(tcs.Task, timeoutTask);
+
+            if (completedTask == timeoutTask)
+            {
+                webView.CoreWebView2.NavigationCompleted -= OnNavigationCompleted;
+                tcs.SetResult(false);
+            }
+
+            return await tcs.Task;
+        }
+
         private void SendTaskProgress<T>(InstaBulkTaskParams<T> taskParams, string message, bool breakLoop = false, TimeSpan? breakLoopWait = null) where T : class, new()
         {
             taskParams.TaskProgress?.Invoke(taskParams.WebView, new InstaPostProgressArgs<T>()
@@ -494,18 +527,21 @@ namespace SocialMediaDataScraper.Models
         {
             var username = new Uri(requestUrl).AbsolutePath.Trim('/');
             var requestFilter = "graphql/query";
+            var requestFilterKey = "X-Root-Field-Name";
+            var requestFilterValue = "xdt_api__v1__feed__user_timeline_graphql_connection";
             var collection = new List<InstaPost>();
             var requests = new Dictionary<string, bool>();
             var errors = new List<string>();
             var random = new Random();
             var successAttempts = 0;
             var failedAttempts = 0;
-            var hasNextPage = true;
+            var hasNextPage = "true";
+            var endCursor = "it will update after page load";
 
             bool IsValidRequest(CoreWebView2WebResourceRequest Request)
             {
                 var check1 = Request.Uri.Contains(requestFilter);
-                var check2 = Request.Headers.Any(x => x.Key.Equals("X-Root-Field-Name", StringComparison.CurrentCultureIgnoreCase) && x.Value.Equals("xdt_api__v1__feed__user_timeline_graphql_connection", StringComparison.CurrentCultureIgnoreCase));
+                var check2 = Request.Headers.Any(x => x.Key.Equals(requestFilterKey, StringComparison.CurrentCultureIgnoreCase) && x.Value.Equals(requestFilterValue, StringComparison.CurrentCultureIgnoreCase));
                 return check1 && check2;
             }
 
@@ -543,7 +579,7 @@ namespace SocialMediaDataScraper.Models
                         return;
                     }
 
-                    var edges = rootObject?["data"]?["xdt_api__v1__feed__user_timeline_graphql_connection"]?["edges"] as JArray;
+                    var edges = rootObject?["data"]?[requestFilterValue]?["edges"] as JArray;
                     if (edges is null || !edges.Any())
                     {
                         failedAttempts++;
@@ -551,6 +587,8 @@ namespace SocialMediaDataScraper.Models
                         return;
                     }
 
+                    hasNextPage = rootObject?["data"]?[requestFilterValue]?["page_info"]?["has_next_page"]?.ToString();
+                    endCursor = rootObject?["data"]?[requestFilterValue]?["page_info"]?["end_cursor"]?.ToString();
                     var list = edges.Select(edge => edge["node"]?.ToObject<InstaPost>())
                         .Where(post => post is not null)
                         .ToList();
@@ -582,13 +620,22 @@ namespace SocialMediaDataScraper.Models
                 taskParams.WebView.CoreWebView2.WebResourceRequested += OnWebResourceRequested;
                 taskParams.WebView.CoreWebView2.WebResourceResponseReceived += OnWebResourceResponseReceived;
 
-                NavigateOrReload(taskParams.WebView, requestUrl);
+                var loaded = await NavigateOrReloadAsync(taskParams.WebView, requestUrl);
+                if (!loaded)
+                {
+                    return new InstaResult<List<InstaPost>>()
+                    {
+                        Status = false,
+                        Content = collection,
+                        Errors = [$"Unable to load url {requestUrl}"]
+                    };
+                }
 
                 while (!taskParams.CancellationToken.IsCancellationRequested)
                 {
                     WebViewHelper.ScrollDown(taskParams.WebView);
 
-                    if (!hasNextPage) break;
+                    if (hasNextPage.Equals("false", StringComparison.CurrentCultureIgnoreCase) || endCursor.Equals("none", StringComparison.CurrentCultureIgnoreCase)) break;
                     if (taskParams.RecordsCount != 0 && collection.Count >= taskParams.RecordsCount) break;
                     if (failedAttempts == taskParams.FailedAttempts) break;
                     if (successAttempts > 0 && successAttempts % taskParams.LoopBreakAttempts == 0)

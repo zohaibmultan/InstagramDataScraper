@@ -562,6 +562,9 @@ namespace SocialMediaDataScraper
             tb_downlaodInterval.Value = StaticInfo.AppSetting?.DownloadInterval ?? 0;
             tb_instagrapiSession.Text = StaticInfo.AppSetting?.InstagrapiSessionId ?? string.Empty;
             tb_instagrapiApiUrl.Text = StaticInfo.AppSetting?.InstagrapiUrl ?? string.Empty;
+            tb_pyDirectory.Text = StaticInfo.AppSetting.PythonScriptDirectory;
+            tb_pyExeDirectory.Text = StaticInfo.AppSetting.PythonExeDirectory;
+            tb_pyFileName.Text = StaticInfo.AppSetting.PythonScriptFileName;
 
             StartDownloadTimer();
         }
@@ -571,6 +574,9 @@ namespace SocialMediaDataScraper
             StaticInfo.AppSetting.ApiUrl = tb_ipAddress.Text.Trim();
             StaticInfo.AppSetting.InstagrapiSessionId = tb_instagrapiSession.Text.Trim();
             StaticInfo.AppSetting.InstagrapiUrl = tb_instagrapiApiUrl.Text.Trim();
+            StaticInfo.AppSetting.PythonScriptDirectory = tb_pyDirectory.Text.Trim();
+            StaticInfo.AppSetting.PythonExeDirectory = tb_pyExeDirectory.Text.Trim();
+            StaticInfo.AppSetting.PythonScriptFileName = tb_pyFileName.Text.Trim();
 
             if (StaticInfo.AppSetting.DownloadInterval != tb_downlaodInterval.Value)
             {
@@ -579,6 +585,7 @@ namespace SocialMediaDataScraper
             }
 
             DbHelper.SaveOne(StaticInfo.AppSetting, x => x.ID == StaticInfo.AppSetting.ID);
+            MessageBox.Show("Settings saved", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         #endregion
     }
