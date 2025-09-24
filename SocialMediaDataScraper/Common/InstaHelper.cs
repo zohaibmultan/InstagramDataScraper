@@ -1,6 +1,7 @@
 ﻿#nullable disable
 
 using LiteDB;
+using Microsoft.VisualBasic.ApplicationServices;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 using Newtonsoft.Json;
@@ -260,7 +261,8 @@ namespace SocialMediaDataScraper.Models
             var requestFilter = "graphql/query";
             var requestUrl = $"https://www.instagram.com/{username}";
             var responseFilterKey = "X-Root-Field-Name";
-            var responseFilterValue = "xdt_api__v1__feed__reels_tray";
+            var responseFilterValue1 = "xdt_api__v1__feed__reels_tray";
+            var responseFilterValue2 = "xdt_api__v1__feed__timeline__connection";
             var tcs = new TaskCompletionSource<InstaResult<string>>();
             var cts = new CancellationTokenSource(waitInSeconds ?? TimeSpan.FromSeconds(60));
             var errors = new List<string>();
@@ -268,8 +270,10 @@ namespace SocialMediaDataScraper.Models
             bool IsValidRequest(CoreWebView2WebResourceRequest Request)
             {
                 var check1 = Request.Uri.Contains(requestFilter);
-                var check2 = Request.Headers.Any(x => x.Key.Equals(responseFilterKey, StringComparison.CurrentCultureIgnoreCase) && x.Value.Equals(responseFilterValue, StringComparison.CurrentCultureIgnoreCase));
-                return check1 && check2;
+                var check2 = Request.Headers.Any(x => x.Key.Equals(responseFilterKey, StringComparison.CurrentCultureIgnoreCase) && x.Value.Equals(responseFilterValue1, StringComparison.CurrentCultureIgnoreCase));
+                var check3 = Request.Headers.Any(x => x.Key.Equals(responseFilterKey, StringComparison.CurrentCultureIgnoreCase) && x.Value.Equals(responseFilterValue2, StringComparison.CurrentCultureIgnoreCase));
+
+                return check1 && (check2 || check3);
             }
 
             async void WebView_WebResourceResponseReceived(object sender, CoreWebView2WebResourceResponseReceivedEventArgs e)
@@ -277,28 +281,33 @@ namespace SocialMediaDataScraper.Models
                 try
                 {
                     if (!IsValidRequest(e.Request)) return;
+                    
+                    isLogin = true;
 
                     var (status, rootObject, errors) = await GetWebResponseJsonObject(e);
                     if (!status)
                     {
-                        tcs.TrySetResult(new() { Status = false, Errors = errors });
+                        tcs.TrySetResult(new() 
+                        { 
+                            Status = true, 
+                            Errors = errors 
+                        });
                         return;
                     }
 
-                    var feed = rootObject?["data"]?[responseFilterValue]?["tray"]?.ToObject<List<InstaReel>>();
-                    if (feed == null)
+                    if(rootObject?["data"]?[responseFilterValue1] != null)
                     {
-                        tcs.TrySetResult(new() { Status = false, Errors = ["Required node not found"] });
-                        return;
+                        var userPk = rootObject?["data"]?["xdt_viewer"]?["user"]?["id"]?.ToString();
+                        tcs.SetResult(new()
+                        {
+                            Status = true,
+                            Content = userPk,
+                        });
                     }
-
-                    var userPk = rootObject?["data"]?["xdt_viewer"]?["user"]?["id"]?.ToString();
-                    isLogin = true;
 
                     tcs.SetResult(new()
                     {
                         Status = true,
-                        Content = userPk,
                     });
                 }
                 catch (Exception ex)
@@ -536,7 +545,7 @@ namespace SocialMediaDataScraper.Models
             var successAttempts = 0;
             var failedAttempts = 0;
             var hasNextPage = "true";
-            var endCursor = "it will update after page load";
+            var endCursor = "it will update after page load, don't change it";
 
             bool IsValidRequest(CoreWebView2WebResourceRequest Request)
             {

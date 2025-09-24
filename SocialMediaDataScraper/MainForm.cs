@@ -5,6 +5,7 @@ using Newtonsoft.Json.Linq;
 using SocialMediaDataScraper.Common;
 using SocialMediaDataScraper.Models;
 using System.ComponentModel;
+using System.Threading;
 
 namespace SocialMediaDataScraper
 {
@@ -13,6 +14,7 @@ namespace SocialMediaDataScraper
         BindingList<DS_UserAccount> userAccounts = [];
         BindingList<DS_BrowserTask> browserTasks = [];
         Dictionary<string, FormDsBrowser> dsBrowsers = [];
+        CancellationTokenSource bulkTaskCancelToken = new CancellationTokenSource();
 
         System.Timers.Timer downloadTimer;
         System.Timers.Timer downloadStatusTimer;
@@ -265,7 +267,7 @@ namespace SocialMediaDataScraper
             var dbModel = DbHelper.SaveOne(model, x => x.ID == model.ID);
             if (dbModel == null) return;
             if (isNew) userAccounts.Add(dbModel);
-            gv_browsers.Refresh();
+            LoadAccountsGrid();
         }
 
         List<DS_UserAccount> GetSelectedAccounts()
@@ -312,7 +314,7 @@ namespace SocialMediaDataScraper
                 }
             });
 
-            gv_browsers.Refresh();
+            LoadAccountsGrid();
         }
 
         private void btn_start_Click(object sender, EventArgs e)
@@ -412,13 +414,20 @@ namespace SocialMediaDataScraper
             btn_taskStart.Enabled = false;
             btn_startAll.Enabled = false;
 
+            if (bulkTaskCancelToken != null)
+            {
+                bulkTaskCancelToken?.Dispose();
+                bulkTaskCancelToken = null;
+            }
+
+            bulkTaskCancelToken = new CancellationTokenSource();
             var subLists = taskList.SplitInto(dsBrowsers.Count, true);
             var zipLists = dsBrowsers.Zip(subLists, (dsBrowser, tasks) => new { dsBrowser, tasks }).ToList();
             var threads = new List<Task>();
 
             foreach (var zip in zipLists)
             {
-                threads.Add(zip.dsBrowser.Value.uc_controller.StartTasks(zip.tasks));
+                threads.Add(zip.dsBrowser.Value.uc_controller.StartTasks(zip.tasks, bulkTaskCancelToken));
             }
 
             await Task.WhenAll(threads);

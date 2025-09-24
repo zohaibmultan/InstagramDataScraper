@@ -1,6 +1,7 @@
 ﻿#nullable disable
 
 using LiteDB;
+using MongoDB.Driver;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,7 +14,7 @@ namespace SocialMediaDataScraper.Common
 {
     public static class DbHelper
     {
-        private static string connectionString = @"Filename=D:\04_Practice\SocialMediaDataScraper\SocialMediaDataScraper\database.db;Connection=shared";
+        private static string connectionString = @"Filename=D:\04_Practice\SocialMediaDataScraper\SocialMediaDataScraper\AppData\database.db;Connection=shared";
 
         public static T SaveOne<T>(T model, Expression<Func<T, bool>> condition = null) where T : class
         {
@@ -139,6 +140,137 @@ namespace SocialMediaDataScraper.Common
                 var value = prop.GetValue(source, null);
                 prop.SetValue(target, value, null);
             }
+        }
+    }
+
+    public static class DbHelper2
+    {
+        private static readonly IMongoClient _client;
+        private static readonly IMongoDatabase _database;
+        private static readonly string connectionString = "mongodb://localhost:27017";
+
+        static DbHelper2()
+        {
+            _client = new MongoClient(connectionString);
+            _database = _client.GetDatabase("your_database_name");
+        }
+
+        public static T SaveOne<T>(T model, Expression<Func<T, bool>> condition = null) where T : class
+        {
+            var collection = _database.GetCollection<T>(typeof(T).Name);
+
+            if (condition != null)
+            {
+                var existing = collection.Find(condition).FirstOrDefault();
+                if (existing != null)
+                {
+                    CopyProperties(model, existing);
+                    var filter = Builders<T>.Filter.Eq("_id", GetIdValue(existing));
+                    var result = collection.ReplaceOne(filter, existing);
+                    return result.IsAcknowledged ? existing : null;
+                }
+            }
+
+            collection.InsertOne(model);
+            return model;
+        }
+
+        public static bool SaveMany<T>(List<T> models, Expression<Func<T, bool>> condition = null) where T : class
+        {
+            var collection = _database.GetCollection<T>(typeof(T).Name);
+            bool anySaved = false;
+
+            foreach (var model in models)
+            {
+                if (condition != null)
+                {
+                    var existing = collection.Find(condition).FirstOrDefault();
+                    if (existing != null)
+                    {
+                        CopyProperties(model, existing);
+                        var filter = Builders<T>.Filter.Eq("_id", GetIdValue(existing));
+                        var result = collection.ReplaceOne(filter, existing);
+                        anySaved |= result.IsAcknowledged;
+                        continue;
+                    }
+                }
+                collection.InsertOne(model);
+                anySaved = true;
+            }
+            return anySaved;
+        }
+
+        public static bool UpdateOne<T>(T model, Expression<Func<T, bool>> condition = null) where T : class
+        {
+            var collection = _database.GetCollection<T>(typeof(T).Name);
+            var filter = condition != null ? condition : Builders<T>.Filter.Eq("_id", GetIdValue(model));
+            var result = collection.ReplaceOne(filter, model);
+            return result.IsAcknowledged && result.ModifiedCount > 0;
+        }
+
+        public static bool UpdateMany<T>(List<T> models, Expression<Func<T, bool>> condition = null) where T : class
+        {
+            var collection = _database.GetCollection<T>(typeof(T).Name);
+            int updatedCount = 0;
+
+            foreach (var model in models)
+            {
+                var filter = condition != null ? condition : Builders<T>.Filter.Eq("_id", GetIdValue(model));
+                var result = collection.ReplaceOne(filter, model);
+                if (result.IsAcknowledged && result.ModifiedCount > 0)
+                    updatedCount++;
+            }
+
+            return updatedCount == models.Count;
+        }
+
+        public static bool Delete<T>(ObjectId id) where T : class
+        {
+            var collection = _database.GetCollection<T>(typeof(T).Name);
+            var filter = Builders<T>.Filter.Eq("_id", id);
+            var result = collection.DeleteOne(filter);
+            return result.IsAcknowledged && result.DeletedCount > 0;
+        }
+
+        public static bool DeleteMany<T>(Expression<Func<T, bool>> condition) where T : class
+        {
+            var collection = _database.GetCollection<T>(typeof(T).Name);
+            var result = collection.DeleteMany(condition);
+            return result.IsAcknowledged && result.DeletedCount >= 0;
+        }
+
+        public static List<T> GetAll<T>() where T : class
+        {
+            var collection = _database.GetCollection<T>(typeof(T).Name);
+            return collection.Find(Builders<T>.Filter.Empty).ToList();
+        }
+
+        public static T GetOne<T>(Expression<Func<T, bool>> condition) where T : class
+        {
+            var collection = _database.GetCollection<T>(typeof(T).Name);
+            return collection.Find(condition).FirstOrDefault();
+        }
+
+        public static List<T> Get<T>(Expression<Func<T, bool>> condition) where T : class
+        {
+            var collection = _database.GetCollection<T>(typeof(T).Name);
+            return collection.Find(condition).ToList();
+        }
+
+        public static void CopyProperties<T>(T source, T target) where T : class
+        {
+            var props = typeof(T).GetProperties().Where(p => p.CanRead && p.CanWrite && p.Name != "_id");
+            foreach (var prop in props)
+            {
+                var value = prop.GetValue(source, null);
+                prop.SetValue(target, value, null);
+            }
+        }
+
+        private static object GetIdValue<T>(T model) where T : class
+        {
+            var idProperty = typeof(T).GetProperty("_id") ?? typeof(T).GetProperty("Id");
+            return idProperty?.GetValue(model);
         }
     }
 }

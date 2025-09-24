@@ -11,7 +11,6 @@ using System.Collections;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace SocialMediaDataScraper
 {
@@ -153,14 +152,8 @@ namespace SocialMediaDataScraper
             _ = RecheckLoginStatus();
         }
 
-        public async Task StartTasks(List<DS_BrowserTask> taskList)
+        public async Task StartTasks(List<DS_BrowserTask> taskList, CancellationTokenSource token)
         {
-            if (cancellationToken != null)
-            {
-                cancellationToken?.Dispose();
-                cancellationToken = null;
-            }
-
             gv_tasks.DataSource = taskList;
             gv_tasks.Columns[nameof(DS_BrowserTask.QueryData)].Visible = false;
             gv_tasks.Columns[nameof(DS_BrowserTask.QueryObjectType)].Visible = false;
@@ -169,7 +162,7 @@ namespace SocialMediaDataScraper
 
             foreach (var task in taskList)
             {
-                if (cancellationToken?.IsCancellationRequested == true) break;
+                if (token?.IsCancellationRequested == true) break;
 
                 logs.Clear();
                 listBox.SafeInvoke(() => listBox.Refresh());
@@ -183,7 +176,7 @@ namespace SocialMediaDataScraper
 
                 DbHelper.UpdateOne(task);
 
-                if (cancellationToken?.IsCancellationRequested == true) break;
+                if (token?.IsCancellationRequested == true) break;
 
                 gv_tasks.Refresh();
                 await Task.Delay(new Random().Next(5, 15));
@@ -521,7 +514,7 @@ namespace SocialMediaDataScraper
             {
                 Log(DS_BrowserLogType.Info, $"Profile data collected, Double click to view", content: data.Content);
                 var root = JObject.Parse(data.Content);
-                
+
                 //if (taskId != null) root["taskId"] = taskId;
                 var model = DbHelper.SaveOne(data.Content);
 
@@ -586,7 +579,6 @@ namespace SocialMediaDataScraper
             Log(DS_BrowserLogType.Info, $"-------- GET POST END --------");
         }
 
-        // todo: jab post end ho jatay hy to system wait per laga rehata hy
         private async Task GetPostsByUser(QueryBulkPosts query = null, ObjectId taskId = null)
         {
             if (webView == null || webView.CoreWebView2 == null) return;

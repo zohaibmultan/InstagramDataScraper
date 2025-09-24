@@ -102,6 +102,7 @@
             btn_stopCommand.TabIndex = 3;
             btn_stopCommand.Text = "Stop";
             btn_stopCommand.UseVisualStyleBackColor = true;
+
             // 
             // tabPage2
             // 

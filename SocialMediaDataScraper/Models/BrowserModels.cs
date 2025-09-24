@@ -137,6 +137,7 @@ namespace SocialMediaDataScraper.Models
         [BsonId]
         public ObjectId ID { get; set; }
 
+        public string Username { get; set; }
         public string QueryAction { get; set; }
 
         public object QueryData { get; set; }
