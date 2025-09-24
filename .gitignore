@@ -363,3 +363,4 @@ MigrationBackup/
 FodyWeavers.xsd
 /SocialMediaDataScraper/SocialMediaDataScraper.csproj
 /SocialMediaDataScraper/database.db
+/SocialMediaDataScraper/AppData/database.db
