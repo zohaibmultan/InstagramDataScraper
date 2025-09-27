@@ -407,7 +407,7 @@ namespace SocialMediaDataScraper.Models
                 webView.CoreWebView2.WebResourceResponseReceived += WebView_WebResourceResponseReceived;
                 NavigateOrReload(webView, requestUrl);
 
-                cts.Token.Register(() => tcs.TrySetResult(new InstaResult<InstaProfile>()
+                cts.Token.Register(() => tcs.TrySetResult(new ()
                 {
                     Status = false,
                     Content = null,
@@ -418,7 +418,7 @@ namespace SocialMediaDataScraper.Models
             }
             catch (Exception ex)
             {
-                return new InstaResult<InstaProfile>
+                return new ()
                 {
                     Status = false,
                     Content = null,
